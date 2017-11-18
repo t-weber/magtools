@@ -1,0 +1,2 @@
+# magtools
+magnetic calculations
