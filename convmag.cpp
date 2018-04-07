@@ -2,6 +2,7 @@
  * converts magnetic space group table
  * @author Tobias Weber
  * @date 18-nov-17
+ * @license see 'LICENSE.EUPL' file
  */
 
 #include <iostream>
@@ -10,7 +11,7 @@
 
 #include <boost/numeric/ublas/matrix.hpp>
 #include <boost/numeric/ublas/vector.hpp>
-#include <boost/numeric/ublas/io.hpp>
+//#include <boost/numeric/ublas/io.hpp>
 namespace ublas = boost::numeric::ublas;
 
 #include <boost/property_tree/ptree.hpp>
@@ -24,6 +25,55 @@ namespace algo = boost::algorithm;
 using t_real = double;
 using t_mat = ublas::matrix<t_real>;
 using t_vec = ublas::vector<t_real>;
+
+
+std::string to_str(const t_mat& mat)
+{
+	std::ostringstream ostr;
+
+	for(std::size_t i=0; i<mat.size1(); ++i)
+	{
+		for(std::size_t j=0; j<mat.size2(); ++j)
+		{
+			ostr << mat(i,j);
+			if(j < mat.size2()-1)
+				ostr << " ";
+		}
+
+		if(i < mat.size2()-1)
+			ostr << "\t";
+	}
+
+	return ostr.str();
+}
+
+std::string to_str(const t_vec& vec)
+{
+	std::ostringstream ostr;
+
+	for(std::size_t i=0; i<vec.size(); ++i)
+	{
+		ostr << vec[i];
+		if(i < vec.size()-1)
+			ostr << " ";
+	}
+
+	return ostr.str();
+}
+
+
+std::ostream& operator<<(std::ostream& ostr, const t_mat& mat)
+{
+	ostr << to_str(mat);
+	return ostr;
+}
+
+
+std::ostream& operator<<(std::ostream& ostr, const t_vec& vec)
+{
+	ostr << to_str(vec);
+	return ostr;
+}
 
 
 template<class T>
@@ -126,6 +176,19 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 	prop.put(strPath + "bns.name", strSGBNS);
 	prop.put(strPath + "og.name", strSGOG);
 
+	std::ostringstream ostrNrBNS, ostrNrOG;
+	ostrNrBNS << iNrBNS[0] << "." << iNrBNS[1];
+	ostrNrOG << iNrOG[0] << "." << iNrOG[1] << "." << iNrOG[2];
+
+	prop.put(strPath + "bns.nr", ostrNrBNS.str());
+	prop.put(strPath + "og.nr", ostrNrOG.str());
+
+	// consistency check
+	if(ostrNrBNS.str()!=strNrBNS || ostrNrOG.str()!=strNrOG)
+		std::cerr << "Mismatch of space group number in " << strSGBNS << "." << std::endl;
+
+	bool bIsHex = (iNrBNS[0]>=143 && iNrBNS[0]<=194);
+
 
 	int iTy = get_num<int>(istr);
 	if(iTy == 4)	// BNS -> OG trafo
@@ -134,29 +197,36 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 		t_vec vecBNS2OG = get_vector(3, istr);
 		t_real numBNS2OG = get_num<t_real>(istr);
 
-		prop.put(strPath + "bns2og.mat", matBNS2OG);
-		prop.put(strPath + "bns2og.vec", vecBNS2OG);
+		prop.put(strPath + "bns2og.mat", to_str(matBNS2OG));
+		prop.put(strPath + "bns2og.vec", to_str(vecBNS2OG));
 		prop.put(strPath + "bns2og.num", numBNS2OG);
 	}
 
 
+	//std::size_t iMaxOperBNS = 0;
 	std::size_t iNumOpsBNS = get_num<std::size_t>(istr);
 	for(std::size_t iPtOp=0; iPtOp<iNumOpsBNS; ++iPtOp)
 	{
 		std::size_t iOperBNS = get_num<std::size_t>(istr);
+		//iMaxOperBNS = std::max(iOperBNS, iMaxOperBNS);
 		t_vec vecBNS = get_vector(3, istr);
 		t_real numBNS = get_num<t_real>(istr);
 		int itInvBNS = get_num<int>(istr);
 
-		// TODO: hexagonal point group ops!
-		if(pPtOps && pHexPtOps)
-			prop.put(strPath + "bns.ops.R" + std::to_string(iPtOp+1), std::get<1>((*pPtOps)[iOperBNS-1]));
+		if(pPtOps && !bIsHex)
+			prop.put(strPath + "bns.ops.R" + std::to_string(iPtOp+1), to_str(std::get<1>(pPtOps->at(iOperBNS-1))));
+		else if(pHexPtOps && bIsHex)
+			prop.put(strPath + "bns.ops.R" + std::to_string(iPtOp+1), to_str(std::get<1>(pHexPtOps->at(iOperBNS-1))));
 		else
+		{
+			std::cerr << "Invalid point group index for " << strSGBNS << "." << std::endl;
 			prop.put(strPath + "bns.ops.R" + std::to_string(iPtOp+1), iOperBNS);
-		prop.put(strPath + "bns.ops.v" + std::to_string(iPtOp+1), vecBNS);
+		}
+		prop.put(strPath + "bns.ops.v" + std::to_string(iPtOp+1), to_str(vecBNS));
 		prop.put(strPath + "bns.ops.d" + std::to_string(iPtOp+1), numBNS);
 		prop.put(strPath + "bns.ops.t" + std::to_string(iPtOp+1), itInvBNS);
 	}
+	//std::cout << "\nmax op: " << iMaxOperBNS << std::endl;
 
 	std::size_t iNumLattVecsBNS = get_num<std::size_t>(istr);
 	for(std::size_t iVec=0; iVec<iNumLattVecsBNS; ++iVec)
@@ -164,7 +234,7 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 		t_vec vecBNS = get_vector(3, istr);
 		t_real numBNS = get_num<t_real>(istr);
 
-		prop.put(strPath + "bns.latt.v" + std::to_string(iVec+1), vecBNS);
+		prop.put(strPath + "bns.latt.v" + std::to_string(iVec+1), to_str(vecBNS));
 		prop.put(strPath + "bns.latt.d" + std::to_string(iVec+1), numBNS);
 	}
 
@@ -186,13 +256,13 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 			t_mat matWycMXMYMZ = get_matrix(3, 3, istr);
 
 			prop.put(strPath + "bns.wyc.site" + std::to_string(iWyc+1)
-				+ ".pos" + std::to_string(iPos+1) + ".v", vecWyc);
+				+ ".pos" + std::to_string(iPos+1) + ".v", to_str(vecWyc));
 			prop.put(strPath + "bns.wyc.site" + std::to_string(iWyc+1)
 				+ ".pos" + std::to_string(iPos+1) + ".d", numWyc);
 			prop.put(strPath + "bns.wyc.site" + std::to_string(iWyc+1)
-				+ ".pos" + std::to_string(iPos+1) + ".R", matWycXYZ);
+				+ ".pos" + std::to_string(iPos+1) + ".R", to_str(matWycXYZ));
 			prop.put(strPath + "bns.wyc.site" + std::to_string(iWyc+1)
-				+ ".pos" + std::to_string(iPos+1) + ".M", matWycMXMYMZ);
+				+ ".pos" + std::to_string(iPos+1) + ".M", to_str(matWycMXMYMZ));
 		}
 	}
 
@@ -207,12 +277,13 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 			t_real numOG = get_num<t_real>(istr);
 			int itInvOG = get_num<int>(istr);
 
-			// TODO: hexagonal point group ops!
-			if(pPtOps && pHexPtOps)
-				prop.put(strPath + "og.ops.R" + std::to_string(iPtOp+1), std::get<1>((*pPtOps)[iOperOG-1]));
+			if(pPtOps && !bIsHex)
+				prop.put(strPath + "og.ops.R" + std::to_string(iPtOp+1), to_str(std::get<1>(pPtOps->at(iOperOG-1))));
+			else if(pHexPtOps && bIsHex)
+				prop.put(strPath + "og.ops.R" + std::to_string(iPtOp+1), to_str(std::get<1>(pHexPtOps->at(iOperOG-1))));
 			else
 				prop.put(strPath + "og.ops.R" + std::to_string(iPtOp+1), iOperOG);
-			prop.put(strPath + "og.ops.v" + std::to_string(iPtOp+1), vecOG);
+			prop.put(strPath + "og.ops.v" + std::to_string(iPtOp+1), to_str(vecOG));
 			prop.put(strPath + "og.ops.d" + std::to_string(iPtOp+1), numOG);
 			prop.put(strPath + "og.ops.t" + std::to_string(iPtOp+1), itInvOG);
 		}
@@ -223,7 +294,7 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 			t_vec vecOG = get_vector(3, istr);
 			t_real numOG = get_num<t_real>(istr);
 
-			prop.put(strPath + "og.latt.v" + std::to_string(iVec+1), vecOG);
+			prop.put(strPath + "og.latt.v" + std::to_string(iVec+1), to_str(vecOG));
 			prop.put(strPath + "og.latt.d" + std::to_string(iVec+1), numOG);
 		}
 
@@ -245,13 +316,13 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 				t_mat matWycMXMYMZ = get_matrix(3, 3, istr);
 
 				prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
-					+ ".pos" + std::to_string(iPos+1) + ".v", vecWyc);
+					+ ".pos" + std::to_string(iPos+1) + ".v", to_str(vecWyc));
 				prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
 					+ ".pos" + std::to_string(iPos+1) + ".d", numWyc);
 				prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
-					+ ".pos" + std::to_string(iPos+1) + ".R", matWycXYZ);
+					+ ".pos" + std::to_string(iPos+1) + ".R", to_str(matWycXYZ));
 				prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
-					+ ".pos" + std::to_string(iPos+1) + ".M", matWycMXMYMZ);
+					+ ".pos" + std::to_string(iPos+1) + ".M", to_str(matWycMXMYMZ));
 			}
 		}
 	}
@@ -266,7 +337,7 @@ void convert_table(const char* pcFile)
 	std::ifstream istr(pcFile);
 	if(!istr)
 	{
-		std::cerr << "Cannot open \"" << pcFile << "\".\n";
+		std::cerr << "Cannot open \"" << pcFile << "\"." << std::endl;
 		return;
 	}
 
@@ -289,12 +360,16 @@ void convert_table(const char* pcFile)
 	std::cout << "Converting space groups...\n";
 	for(std::size_t i=0; i<1651; ++i)
 	{
+		std::cout << "\rGroup " << (i+1) << " / 1651...     ";
+		std::cout.flush();
+
 		std::string strPath = "mag_groups.sg" + std::to_string(i+1) + ".";
 		convert_spacegroup(istr, prop, strPath, &vecPtOps, &vecHexPtOps);
 	}
+	std::cout << "\n";
 
 
-	ptree::write_xml("maggroups.xml", prop,
+	ptree::write_xml("magsg.xml", prop,
 		std::locale(),
 		ptree::xml_writer_make_settings('\t', 1, std::string("utf-8")));
 }
