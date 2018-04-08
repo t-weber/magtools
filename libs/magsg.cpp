@@ -143,9 +143,9 @@ bool Spacegroups<t_mat, t_vec>::Load(const std::string& strFile)
 		};
 
 		if(opsBNS)
-			std::tie(sg.m_rotBNS, sg.m_transBNS, sg.m_invBNS) = std::move(load_ops(opsBNS));
+			std::tie(sg.m_symBNS.m_rot, sg.m_symBNS.m_trans, sg.m_symBNS.m_inv) = std::move(load_ops(opsBNS));
 		if(opsOG)
-			std::tie(sg.m_rotOG, sg.m_transOG, sg.m_invOG) = std::move(load_ops(opsOG));
+			std::tie(sg.m_symOG.m_rot, sg.m_symOG.m_trans, sg.m_symOG.m_inv) = std::move(load_ops(opsOG));
 		// --------------------------------------------------------------------
 
 
@@ -181,6 +181,62 @@ bool Spacegroups<t_mat, t_vec>::Load(const std::string& strFile)
 
 		if(lattBNS)
 			std::tie(sg.m_latticeBNS) = std::move(load_latt(lattBNS));
+		// --------------------------------------------------------------------
+
+
+
+		// --------------------------------------------------------------------
+		// iterate wyckoff positions
+		auto load_wyc = [&get_vec, &get_mat](const decltype(wycBNS)& wycs)
+			-> std::vector<WycPositions<t_mat, t_vec>>
+		{
+			std::vector<WycPositions<t_mat, t_vec>> vecWyc;
+
+			for(std::size_t iWyc=1; true; ++iWyc)
+			{
+				std::string nameSite = "site" + std::to_string(iWyc);
+				auto wyc = wycs->get_child_optional(nameSite);
+				if(!wyc) break;
+
+
+				WycPositions<t_mat, t_vec> wycpos;
+
+				for(std::size_t iPos=1; true; ++iPos)
+				{
+					std::string strPos = std::to_string(iPos);
+					std::string nameRot = "R" + strPos;
+					std::string nameRotMag = "M" + strPos;
+					std::string nameTrans = "v" + strPos;
+					std::string nameDiv = "d" + strPos;
+
+					auto opRot = wyc->get_optional<std::string>(nameRot);
+					auto opRotMag = wyc->get_optional<std::string>(nameRotMag);
+					auto opTrans = wyc->get_optional<std::string>(nameTrans);
+					auto opdiv = wyc->get_optional<t_real>(nameDiv);
+
+					if(!opRot)
+						break;
+
+					t_real div = opdiv ? *opdiv : t_real(1);
+					t_mat rot = opRot ? get_mat(*opRot) : m::unit<t_mat>(3,3);
+					t_mat rotMag = opRotMag ? get_mat(*opRotMag) : rot;
+					t_vec trans = opTrans ? get_vec(*opTrans) : m::zero<t_vec>(3);
+					trans /= div;
+
+					wycpos.m_rot.emplace_back(std::move(rot));
+					wycpos.m_rotMag.emplace_back(std::move(rotMag));
+					wycpos.m_trans.emplace_back(std::move(trans));
+				}
+
+				vecWyc.emplace_back(std::move(wycpos));
+			}
+
+			return vecWyc;
+		};
+
+
+		if(wycBNS) sg.m_wycBNS = std::move(load_wyc(wycBNS));
+		if(wycOG) sg.m_wycOG = std::move(load_wyc(wycOG));
 		// --------------------------------------------------------------------
 
 
