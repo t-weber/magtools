@@ -143,9 +143,20 @@ bool Spacegroups<t_mat, t_vec>::Load(const std::string& strFile)
 		};
 
 		if(opsBNS)
-			std::tie(sg.m_symBNS.m_rot, sg.m_symBNS.m_trans, sg.m_symBNS.m_inv) = std::move(load_ops(opsBNS));
+		{
+			sg.m_symBNS = std::make_shared<Symmetry<t_mat, t_vec>>();
+			std::tie(sg.m_symBNS->m_rot, sg.m_symBNS->m_trans, sg.m_symBNS->m_inv) = std::move(load_ops(opsBNS));
+		}
 		if(opsOG)
-			std::tie(sg.m_symOG.m_rot, sg.m_symOG.m_trans, sg.m_symOG.m_inv) = std::move(load_ops(opsOG));
+		{
+			sg.m_symOG = std::make_shared<Symmetry<t_mat, t_vec>>();
+			std::tie(sg.m_symOG->m_rot, sg.m_symOG->m_trans, sg.m_symOG->m_inv) = std::move(load_ops(opsOG));
+		}
+		else
+		{
+			// if OG is not defined, it's identical to BNS
+			sg.m_symOG = sg.m_symBNS;
+		}
 		// --------------------------------------------------------------------
 
 
@@ -153,7 +164,7 @@ bool Spacegroups<t_mat, t_vec>::Load(const std::string& strFile)
 		// --------------------------------------------------------------------
 		// iterate over lattice vectors
 		auto load_latt = [&get_vec](const decltype(lattBNS)& latt)
-			-> std::tuple<std::vector<t_vec>>
+			-> std::vector<t_vec>
 		{
 			std::vector<t_vec> vectors;
 
@@ -176,11 +187,24 @@ bool Spacegroups<t_mat, t_vec>::Load(const std::string& strFile)
 				vectors.emplace_back(std::move(vec));
 			}
 
-			return std::make_tuple(std::move(vectors));
+			return std::move(vectors);
 		};
 
 		if(lattBNS)
-			std::tie(sg.m_latticeBNS) = std::move(load_latt(lattBNS));
+		{
+			sg.m_latticeBNS = std::make_shared<std::vector<t_vec>>();
+			*sg.m_latticeBNS = std::move(load_latt(lattBNS));
+		}
+		if(lattOG)
+		{
+			sg.m_latticeOG = std::make_shared<std::vector<t_vec>>();
+			*sg.m_latticeOG = std::move(load_latt(lattOG));
+		}
+		else
+		{
+			// if OG is not defined, it's identical to BNS
+			sg.m_latticeOG = sg.m_latticeBNS;
+		}
 		// --------------------------------------------------------------------
 
 
@@ -198,8 +222,13 @@ bool Spacegroups<t_mat, t_vec>::Load(const std::string& strFile)
 				auto wyc = wycs->get_child_optional(nameSite);
 				if(!wyc) break;
 
-
 				WycPositions<t_mat, t_vec> wycpos;
+
+				auto opLetter = wyc->get_optional<std::string>("l");
+				auto opMult = wyc->get_optional<int>("m");
+				if(opLetter) wycpos.m_letter = *opLetter;
+				wycpos.m_mult = opMult ? *opMult : 0;
+
 
 				for(std::size_t iPos=1; true; ++iPos)
 				{
@@ -231,14 +260,26 @@ bool Spacegroups<t_mat, t_vec>::Load(const std::string& strFile)
 				vecWyc.emplace_back(std::move(wycpos));
 			}
 
-			return vecWyc;
+			return std::move(vecWyc);
 		};
 
 
-		if(wycBNS) sg.m_wycBNS = std::move(load_wyc(wycBNS));
-		if(wycOG) sg.m_wycOG = std::move(load_wyc(wycOG));
+		if(wycBNS)
+		{
+			sg.m_wycBNS = std::make_shared<std::vector<WycPositions<t_mat, t_vec>>>();
+			*sg.m_wycBNS = std::move(load_wyc(wycBNS));
+		}
+		if(wycOG)
+		{
+			sg.m_wycOG = std::make_shared<std::vector<WycPositions<t_mat, t_vec>>>();
+			*sg.m_wycOG = std::move(load_wyc(wycOG));
+		}
+		else
+		{
+			// if OG is not defined, it's identical to BNS
+			sg.m_wycOG = sg.m_wycBNS;
+		}
 		// --------------------------------------------------------------------
-
 
 
 		m_sgs.emplace_back(std::move(sg));

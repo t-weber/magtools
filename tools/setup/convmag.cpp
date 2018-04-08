@@ -245,8 +245,8 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 		std::size_t iMult = get_num<std::size_t>(istr);
 		std::string strWycName = get_string(istr);
 
-		prop.put(strPath + "bns.wyc.site" + std::to_string(iWyc+1) + ".name", strWycName);
-		prop.put(strPath + "bns.wyc.site" + std::to_string(iWyc+1) + ".mult", iMult);
+		prop.put(strPath + "bns.wyc.site" + std::to_string(iWyc+1) + ".l", strWycName);
+		prop.put(strPath + "bns.wyc.site" + std::to_string(iWyc+1) + ".m", iMult);
 
 		for(std::size_t iPos=0; iPos<iNumPos; ++iPos)
 		{
@@ -256,13 +256,13 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 			t_mat matWycMXMYMZ = get_matrix(3, 3, istr);
 
 			prop.put(strPath + "bns.wyc.site" + std::to_string(iWyc+1)
-				+ ".pos" + std::to_string(iPos+1) + ".v", to_str(vecWyc));
+				+ ".v" + std::to_string(iPos+1), to_str(vecWyc));
 			prop.put(strPath + "bns.wyc.site" + std::to_string(iWyc+1)
-				+ ".pos" + std::to_string(iPos+1) + ".d", numWyc);
+				+ ".d" + std::to_string(iPos+1), numWyc);
 			prop.put(strPath + "bns.wyc.site" + std::to_string(iWyc+1)
-				+ ".pos" + std::to_string(iPos+1) + ".R", to_str(matWycXYZ));
+				+ ".R" + std::to_string(iPos+1), to_str(matWycXYZ));
 			prop.put(strPath + "bns.wyc.site" + std::to_string(iWyc+1)
-				+ ".pos" + std::to_string(iPos+1) + ".M", to_str(matWycMXMYMZ));
+				+ ".M" + std::to_string(iPos+1), to_str(matWycMXMYMZ));
 		}
 	}
 
@@ -305,8 +305,8 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 			std::size_t iMult = get_num<std::size_t>(istr);
 			std::string strWycName = get_string(istr);
 
-			prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1) + ".name", strWycName);
-			prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1) + ".mult", iMult);
+			prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1) + ".l", strWycName);
+			prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1) + ".m", iMult);
 
 			for(std::size_t iPos=0; iPos<iNumPos; ++iPos)
 			{
@@ -316,13 +316,13 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 				t_mat matWycMXMYMZ = get_matrix(3, 3, istr);
 
 				prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
-					+ ".pos" + std::to_string(iPos+1) + ".v", to_str(vecWyc));
+					+ ".v" + std::to_string(iPos+1) , to_str(vecWyc));
 				prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
-					+ ".pos" + std::to_string(iPos+1) + ".d", numWyc);
+					+ ".d" + std::to_string(iPos+1) , numWyc);
 				prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
-					+ ".pos" + std::to_string(iPos+1) + ".R", to_str(matWycXYZ));
+					+ ".R" + std::to_string(iPos+1) , to_str(matWycXYZ));
 				prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
-					+ ".pos" + std::to_string(iPos+1) + ".M", to_str(matWycMXMYMZ));
+					+ ".M" + std::to_string(iPos+1), to_str(matWycMXMYMZ));
 			}
 		}
 	}
