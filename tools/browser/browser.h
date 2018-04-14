@@ -9,9 +9,11 @@
 #define __SGBROWSE_H__
 
 
-#include <QtWidgets/QDialog>
 #include <QtCore/QSettings>
 #include <QtGui/QGenericMatrix>
+#include <QtWidgets/QDialog>
+#include <QtWidgets/QTreeWidgetItem>
+#include <QtWidgets/QListWidgetItem>
 
 #include "libs/magsg.h"
 #include "libs/math_conts.h"
@@ -37,6 +39,8 @@ protected:
 	virtual void showEvent(QShowEvent *pEvt) override;
 	virtual void hideEvent(QHideEvent *pEvt) override;
 	virtual void closeEvent(QCloseEvent *pEvt) override;
+
+	void SpaceGroupSelected(QTreeWidgetItem *pItem);
 
 public:
 	using QDialog::QDialog;

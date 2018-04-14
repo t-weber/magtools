@@ -6,8 +6,7 @@
  */
 
 #include "browser.h"
-
-#include <QtWidgets/QTreeWidgetItem>
+#include <sstream>
 
 
 // ----------------------------------------------------------------------------
@@ -18,6 +17,7 @@ SgBrowserDlg::SgBrowserDlg(QWidget* pParent, QSettings *pSett)
 {
 	this->setupUi(this);
 
+	// restore settings
 	if(m_pSettings)
 	{
 		if(m_pSettings->contains("sgbrowser/geo"))
@@ -27,6 +27,9 @@ SgBrowserDlg::SgBrowserDlg(QWidget* pParent, QSettings *pSett)
 	}
 
 	SetupSpaceGroups();
+
+	// connections
+	connect(m_pTree, &QTreeWidget::currentItemChanged, this, &SgBrowserDlg::SpaceGroupSelected);
 }
 
 
@@ -82,6 +85,7 @@ void SgBrowserDlg::SetupSpaceGroup(const Spacegroup<t_mat_sg, t_vec_sg>& sg)
 		pTopItem = new QTreeWidgetItem();
 		pTopItem->setText(0, structname);
 		pTopItem->setData(0, Qt::UserRole, iNrStruct);
+		pTopItem->setData(0, Qt::UserRole+1, iNrMag);
 		m_pTree->addTopLevelItem(pTopItem);
 	}
 
@@ -91,11 +95,135 @@ void SgBrowserDlg::SetupSpaceGroup(const Spacegroup<t_mat_sg, t_vec_sg>& sg)
 
 	auto *pSubItem = new QTreeWidgetItem();
 	pSubItem->setText(0, magname);
-	pTopItem->setData(0, Qt::UserRole, iNrStruct);
-	pTopItem->setData(0, Qt::UserRole+1, iNrMag);
+	pSubItem->setData(0, Qt::UserRole, iNrStruct);
+	pSubItem->setData(0, Qt::UserRole+1, iNrMag);
 	pTopItem->addChild(pSubItem);
 }
 // ----------------------------------------------------------------------------
+
+
+/**
+ * space group selected
+ */
+void SgBrowserDlg::SpaceGroupSelected(QTreeWidgetItem *pItem)
+{
+	if(!pItem) return;
+
+	int iNrStruct = pItem->data(0, Qt::UserRole).toInt();
+	int iNrMag = pItem->data(0, Qt::UserRole+1).toInt();
+
+	const auto* pSg = m_sgs.GetSpacegroupByNumber(iNrStruct, iNrMag);
+	if(!pSg) return;
+
+
+	// print a symmetry operator
+	auto print_sym = [](const t_mat_sg& mat, const t_vec_sg& vec, t_real_sg inv) -> std::string
+	{
+		std::ostringstream ostr;
+
+		for(std::size_t i=0; i<mat.size1(); ++i)
+		{
+			// rotation matrix
+			ostr << "( ";
+			for(std::size_t j=0; j<mat.size2(); ++j)
+				ostr << std::setw(ostr.precision()*1.5) << std::right << mat(i,j);
+			ostr << " )";
+
+			// translation vector
+			ostr << std::setw(ostr.precision()*2) << std::right << "( ";
+			ostr << std::setw(ostr.precision()*1.5) << std::right << vec[i]; 
+			ostr << " )";
+
+			// time inversion
+			if(i==mat.size1()/2)
+			{
+				ostr << std::setw(ostr.precision()*2) << std::right << "t = ";
+				ostr << inv;
+			}
+
+			if(i < mat.size1()-1)
+				ostr << "\n";
+		}
+
+		return ostr.str();
+	};
+
+
+	// print a wyckoff position
+	auto print_wyc = [](const t_mat_sg& mat, const t_mat_sg& matRot,  const t_vec_sg& vec) -> std::string
+	{
+		std::ostringstream ostr;
+
+		for(std::size_t i=0; i<mat.size1(); ++i)
+		{
+			// rotation matrices
+			ostr << "( ";
+			for(std::size_t j=0; j<mat.size2(); ++j)
+				ostr << std::setw(ostr.precision()*1.5) << std::right << mat(i,j);
+
+			ostr  << " | ";
+			for(std::size_t j=0; j<matRot.size2(); ++j)
+				ostr << std::setw(ostr.precision()*1.5) << std::right << matRot(i,j);
+			ostr << " )";
+
+			// translation vector
+			ostr << std::setw(ostr.precision()*2) << std::right << "( ";
+			ostr << std::setw(ostr.precision()*1.5) << std::right << vec[i]; 
+			ostr << " )";
+
+			if(i < mat.size1()-1)
+				ostr << "\n";
+		}
+
+		return ostr.str();
+	};
+
+
+	// iterate over symmetries
+	m_pSymOps->clear();
+
+	const auto *symms = pSg->GetSymmetries();
+	if(symms)
+	{
+		for(std::size_t iOp=0; iOp<symms->GetRotations().size(); ++iOp)
+		{
+			const auto& rot = symms->GetRotations()[iOp];
+			const auto& trans = symms->GetTranslations()[iOp];
+			const auto inv = symms->GetInversions()[iOp];
+
+			auto *pOpItem = new QListWidgetItem();
+			pOpItem->setText(print_sym(rot, trans, inv).c_str());
+			m_pSymOps->addItem(pOpItem);
+		}
+	}
+
+
+	// iterate over wyckoff positions
+	m_pWyc->clear();
+	const auto *wycs = pSg->GetWycPositions();
+	if(wycs)
+	{
+		for(const auto &wyc : *wycs)
+		{
+			auto *pWycItem = new QTreeWidgetItem();
+			pWycItem->setText(0, wyc.GetName().c_str());
+
+			// iterate over trafos
+			for(std::size_t iOp=0; iOp<wyc.GetRotations().size(); ++iOp)
+			{
+				const auto& rot = wyc.GetRotations()[iOp];
+				const auto& rotMag = wyc.GetRotationsMag()[iOp];
+				const auto& trans = wyc.GetTranslations()[iOp];
+
+				auto *pSubItem = new QTreeWidgetItem();
+				pSubItem->setText(0, print_wyc(rot, rotMag, trans).c_str());
+				pWycItem->addChild(pSubItem);
+			}
+
+			m_pWyc->addTopLevelItem(pWycItem);
+		}
+	}
+}
 
 
 void SgBrowserDlg::showEvent(QShowEvent *pEvt)

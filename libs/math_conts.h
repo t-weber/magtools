@@ -395,6 +395,31 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 
 	return ostr;
 }
+
+
+/**
+ * prints matrix in nicely formatted form
+ */
+template<class t_mat>
+std::ostream& niceprint(std::ostream& ostr, const t_mat& mat)
+requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
+{
+	const std::size_t ROWS = mat.size1();
+	const std::size_t COLS = mat.size2();
+
+	for(std::size_t i=0; i<ROWS; ++i)
+	{
+		ostr << "(";
+		for(std::size_t j=0; j<COLS; ++j)
+			ostr << std::setw(ostr.precision()*1.5) << std::right << mat(i,j);
+		ostr << ")";
+
+		if(i < ROWS-1)
+			ostr << "\n";
+	}
+
+	return ostr;
+}
 // ----------------------------------------------------------------------------
 
 

@@ -155,7 +155,7 @@ public:
 	const std::vector<t_vec>* GetLattice(bool bBNS=1) const
 	{ return bBNS ? m_latticeBNS.get() : m_latticeOG.get(); }
 
-	const std::vector<Symmetry<t_mat, t_vec>>* GetSymmetries(bool bBNS=1) const
+	const Symmetry<t_mat, t_vec>* GetSymmetries(bool bBNS=1) const
 	{ return bBNS ? m_symBNS.get() : m_symOG.get(); }
 
 	const std::vector<WycPositions<t_mat, t_vec>>* GetWycPositions(bool bBNS=1) const
@@ -185,6 +185,19 @@ public:
 
 	const std::vector<Spacegroup<t_mat, t_vec>>* GetSpacegroups() const
 	{ return &m_sgs; }
+
+	const Spacegroup<t_mat, t_vec>* GetSpacegroupByNumber(int iStruc, int iMag) const
+	{
+		auto iter = std::find_if(m_sgs.begin(), m_sgs.end(),
+			[iStruc, iMag](const auto& sg) -> bool
+			{
+				return  (sg.GetStructNumber()==iStruc && sg.GetMagNumber()==iMag);
+			});
+
+		if(iter == m_sgs.end())
+			return nullptr;
+		return &*iter;
+	}
 };
 // ----------------------------------------------------------------------------
 
