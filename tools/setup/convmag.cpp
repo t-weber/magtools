@@ -3,6 +3,8 @@
  * @author Tobias Weber
  * @date 18-nov-17
  * @license see 'LICENSE.EUPL' file
+ *
+ * g++ -o convmag -O2 -std=c++17 tools/setup/convmag.cpp
  */
 
 #include <iostream>
@@ -197,9 +199,9 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 		t_vec vecBNS2OG = get_vector(3, istr);
 		t_real numBNS2OG = get_num<t_real>(istr);
 
-		prop.put(strPath + "bns2og.mat", to_str(matBNS2OG));
-		prop.put(strPath + "bns2og.vec", to_str(vecBNS2OG));
-		prop.put(strPath + "bns2og.num", numBNS2OG);
+		prop.put(strPath + "bns2og.R", to_str(matBNS2OG));
+		prop.put(strPath + "bns2og.v", to_str(vecBNS2OG));
+		prop.put(strPath + "bns2og.d", numBNS2OG);
 	}
 
 
