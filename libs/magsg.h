@@ -152,13 +152,13 @@ public:
 	int GetStructNumber() const { return m_sgnrStruct; }
 	int GetMagNumber() const { return m_sgnrMag; }
 
-	const std::vector<t_vec>* GetLattice(bool bBNS=1) const
+	const std::vector<t_vec>* GetLattice(bool bBNS=true) const
 	{ return bBNS ? m_latticeBNS.get() : m_latticeOG.get(); }
 
-	const Symmetry<t_mat, t_vec>* GetSymmetries(bool bBNS=1) const
+	const Symmetry<t_mat, t_vec>* GetSymmetries(bool bBNS=true) const
 	{ return bBNS ? m_symBNS.get() : m_symOG.get(); }
 
-	const std::vector<WycPositions<t_mat, t_vec>>* GetWycPositions(bool bBNS=1) const
+	const std::vector<WycPositions<t_mat, t_vec>>* GetWycPositions(bool bBNS=true) const
 	{ return bBNS ? m_wycBNS.get() : m_wycOG.get(); }
 };
 // ----------------------------------------------------------------------------
@@ -307,6 +307,31 @@ bool Spacegroups<t_mat, t_vec>::Load(const std::string& strFile)
 
 				return mat;
 		};
+
+		// transforms a BNS vector to OG
+		// TODO: check!
+		auto calc_bns2og = [](const auto& rotBNS2OG, const auto& transBNS2OG, auto *vecs) -> void
+		{
+			for(auto& vec : *vecs)
+				vec = rotBNS2OG*vec + transBNS2OG;
+		};
+		// --------------------------------------------------------------------
+
+
+
+		// --------------------------------------------------------------------
+		// BNS to OG trafo
+		if(bns2og)
+		{
+			auto opBNS2OGTrafo = bns2og->get_optional<std::string>("R");
+			auto opBNS2OGTrans = bns2og->get_optional<std::string>("v");
+			auto opBNS2OGdiv = bns2og->get_optional<t_real>("d");
+
+			sg.m_rotBNS2OG = opBNS2OGTrafo ? get_mat(*opBNS2OGTrafo) : m::unit<t_mat>(3,3);
+			sg.m_transBNS2OG = opBNS2OGTrans ? get_vec(*opBNS2OGTrans) : m::zero<t_vec>(3);
+			t_real divBNS2OG = opBNS2OGdiv ? *opBNS2OGdiv : t_real(1);
+			sg.m_transBNS2OG /= divBNS2OG;
+		}
 		// --------------------------------------------------------------------
 
 
@@ -362,32 +387,28 @@ bool Spacegroups<t_mat, t_vec>::Load(const std::string& strFile)
 		}
 		else
 		{
-			// if OG is not defined, it's identical to BNS
-			sg.m_symOG = sg.m_symBNS;
+			if(!bns2og)
+			{
+				// if neither OG nor BNS to OG trafo are defined, OG is identical to BNS
+				sg.m_symOG = sg.m_symBNS;
+			}
+			else
+			{
+				// calculate OG from BNS using trafo
+				sg.m_symOG = std::make_shared<Symmetry<t_mat, t_vec>>(*sg.m_symBNS);
+				calc_bns2og(sg.m_rotBNS2OG, sg.m_transBNS2OG, &sg.m_symOG->m_trans);
+
+				//std::cout << "bns2og trafo for sg " << sg.GetNumber() << std::endl;
+			}
 		}
 		// --------------------------------------------------------------------
 
-
-		// --------------------------------------------------------------------
-		// BNS to OG trafo
-		if(bns2og)
-		{
-			auto opBNS2OGTrafo = bns2og->get_optional<std::string>("R");
-			auto opBNS2OGTrans = bns2og->get_optional<std::string>("v");
-			auto opBNS2OGdiv = bns2og->get_optional<t_real>("d");
-
-			t_mat rotBNS2OG = opBNS2OGTrafo ? get_mat(*opBNS2OGTrafo) : m::unit<t_mat>(3,3);
-			t_vec transBNS2OG = opBNS2OGTrans ? get_vec(*opBNS2OGTrans) : m::zero<t_vec>(3);
-			t_real divBNS2OG = opBNS2OGdiv ? *opBNS2OGdiv : t_real(1);
-			transBNS2OG /= divBNS2OG;
-		}
-		// --------------------------------------------------------------------
 
 
 		// --------------------------------------------------------------------
 		// iterate over lattice vectors
 		auto load_latt = [&get_vec](const decltype(lattBNS)& latt)
-		-> std::vector<t_vec>
+			-> std::vector<t_vec>
 		{
 			std::vector<t_vec> vectors;
 
@@ -425,8 +446,17 @@ bool Spacegroups<t_mat, t_vec>::Load(const std::string& strFile)
 		}
 		else
 		{
-			// if OG is not defined, it's identical to BNS
-			sg.m_latticeOG = sg.m_latticeBNS;
+			if(!bns2og)
+			{
+				// if neither OG nor BNS to OG trafo are defined, OG is identical to BNS
+				sg.m_latticeOG = sg.m_latticeBNS;
+			}
+			else
+			{
+				// calculate OG from BNS using trafo
+				sg.m_latticeOG = std::make_shared<std::vector<t_vec>>(*sg.m_latticeBNS);
+				calc_bns2og(sg.m_rotBNS2OG, sg.m_transBNS2OG, sg.m_latticeOG.get());
+			}
 		}
 		// --------------------------------------------------------------------
 
@@ -498,8 +528,19 @@ bool Spacegroups<t_mat, t_vec>::Load(const std::string& strFile)
 		}
 		else
 		{
-			// if OG is not defined, it's identical to BNS
-			sg.m_wycOG = sg.m_wycBNS;
+			if(!bns2og)
+			{
+				// if neither OG nor BNS to OG trafo are defined, OG is identical to BNS
+				sg.m_wycOG = sg.m_wycBNS;
+			}
+			else
+			{
+				// calculate OG from BNS using trafo
+				sg.m_wycOG = std::make_shared<std::vector<WycPositions<t_mat, t_vec>>>(*sg.m_wycBNS);
+
+				for(auto& wycpos : *sg.m_wycOG)
+					calc_bns2og(sg.m_rotBNS2OG, sg.m_transBNS2OG, &wycpos.m_trans);
+			}
 		}
 		// --------------------------------------------------------------------
 

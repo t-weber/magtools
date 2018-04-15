@@ -8,6 +8,8 @@
 #include "browser.h"
 #include <sstream>
 
+#include <QtWidgets/QMenuBar>
+
 
 // ----------------------------------------------------------------------------
 
@@ -15,8 +17,26 @@
 SgBrowserDlg::SgBrowserDlg(QWidget* pParent, QSettings *pSett)
 	: QDialog{pParent}, m_pSettings{pSett}
 {
+	// ------------------------------------------------------------------------
+	// setup UI
 	this->setupUi(this);
+	auto *pLayout = this->layout();
 
+	// menu
+	auto *pMenuBar = new QMenuBar(this);
+	auto *pMenuOptions = new QMenu("Options", pMenuBar);
+
+	auto *pShowBNS = new QAction("Show BNS", pMenuOptions);
+	pShowBNS->setCheckable(true);
+	pShowBNS->setChecked(true);
+	pMenuOptions->addAction(pShowBNS);
+
+	pMenuBar->addMenu(pMenuOptions);
+	pLayout->setMenuBar(pMenuBar);
+	// ------------------------------------------------------------------------
+
+
+	// ------------------------------------------------------------------------
 	// restore settings
 	if(m_pSettings)
 	{
@@ -25,11 +45,18 @@ SgBrowserDlg::SgBrowserDlg(QWidget* pParent, QSettings *pSett)
 		//if(m_pSettings->contains("sgbrowser/state"))
 		//	this->restoreState(m_pSettings->value("sgbrowser/state").toByteArray());
 	}
+	// ------------------------------------------------------------------------
 
+
+	// load data
 	SetupSpaceGroups();
 
+
+	// ------------------------------------------------------------------------
 	// connections
 	connect(m_pTree, &QTreeWidget::currentItemChanged, this, &SgBrowserDlg::SpaceGroupSelected);
+	connect(pShowBNS, &QAction::toggled, this, &SgBrowserDlg::SwitchToBNS);
+	// ------------------------------------------------------------------------
 }
 
 
@@ -39,7 +66,9 @@ SgBrowserDlg::SgBrowserDlg(QWidget* pParent, QSettings *pSett)
  */
 void SgBrowserDlg::SetupSpaceGroups()
 {
+	std::cerr << "Loading space groups ... ";
 	m_sgs.Load("../magsg.xml");
+	std::cerr << "Done." << std::endl;
 
 	const auto *pSgs = m_sgs.GetSpacegroups();
 	if(pSgs)
@@ -103,12 +132,21 @@ void SgBrowserDlg::SetupSpaceGroup(const Spacegroup<t_mat_sg, t_vec_sg>& sg)
 
 
 /**
+ * switched to show BNS (otherwise OG)
+ */
+void SgBrowserDlg::SwitchToBNS(bool bBNS)
+{
+	m_showBNS = bBNS;
+	SpaceGroupSelected(m_pTree->currentItem());
+}
+
+
+/**
  * space group selected
  */
 void SgBrowserDlg::SpaceGroupSelected(QTreeWidgetItem *pItem)
 {
 	if(!pItem) return;
-
 	int iNrStruct = pItem->data(0, Qt::UserRole).toInt();
 	int iNrMag = pItem->data(0, Qt::UserRole+1).toInt();
 
@@ -182,7 +220,7 @@ void SgBrowserDlg::SpaceGroupSelected(QTreeWidgetItem *pItem)
 	// iterate over symmetries
 	m_pSymOps->clear();
 
-	const auto *symms = pSg->GetSymmetries();
+	const auto *symms = pSg->GetSymmetries(m_showBNS);
 	if(symms)
 	{
 		for(std::size_t iOp=0; iOp<symms->GetRotations().size(); ++iOp)
@@ -200,7 +238,7 @@ void SgBrowserDlg::SpaceGroupSelected(QTreeWidgetItem *pItem)
 
 	// iterate over wyckoff positions
 	m_pWyc->clear();
-	const auto *wycs = pSg->GetWycPositions();
+	const auto *wycs = pSg->GetWycPositions(m_showBNS);
 	if(wycs)
 	{
 		for(const auto &wyc : *wycs)

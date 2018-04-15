@@ -31,7 +31,9 @@ class SgBrowserDlg : public QDialog, Ui::SgBrowserDlg
 private:
 	QSettings *m_pSettings = nullptr;
 	Spacegroups<t_mat_sg, t_vec_sg> m_sgs;
+	bool m_showBNS = true;
 
+private:
 	void SetupSpaceGroup(const Spacegroup<t_mat_sg, t_vec_sg>& sg);
 	void SetupSpaceGroups();
 
@@ -40,7 +42,9 @@ protected:
 	virtual void hideEvent(QHideEvent *pEvt) override;
 	virtual void closeEvent(QCloseEvent *pEvt) override;
 
+	// slots
 	void SpaceGroupSelected(QTreeWidgetItem *pItem);
+	void SwitchToBNS(bool bBNS);
 
 public:
 	using QDialog::QDialog;

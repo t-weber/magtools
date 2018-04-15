@@ -29,6 +29,8 @@ using t_mat = ublas::matrix<t_real>;
 using t_vec = ublas::vector<t_real>;
 
 
+bool bSaveOG = true;
+
 std::string to_str(const t_mat& mat)
 {
 	std::ostringstream ostr;
@@ -279,15 +281,18 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 			t_real numOG = get_num<t_real>(istr);
 			int itInvOG = get_num<int>(istr);
 
-			if(pPtOps && !bIsHex)
-				prop.put(strPath + "og.ops.R" + std::to_string(iPtOp+1), to_str(std::get<1>(pPtOps->at(iOperOG-1))));
-			else if(pHexPtOps && bIsHex)
-				prop.put(strPath + "og.ops.R" + std::to_string(iPtOp+1), to_str(std::get<1>(pHexPtOps->at(iOperOG-1))));
-			else
-				prop.put(strPath + "og.ops.R" + std::to_string(iPtOp+1), iOperOG);
-			prop.put(strPath + "og.ops.v" + std::to_string(iPtOp+1), to_str(vecOG));
-			prop.put(strPath + "og.ops.d" + std::to_string(iPtOp+1), numOG);
-			prop.put(strPath + "og.ops.t" + std::to_string(iPtOp+1), itInvOG);
+			if(bSaveOG)
+			{
+				if(pPtOps && !bIsHex)
+					prop.put(strPath + "og.ops.R" + std::to_string(iPtOp+1), to_str(std::get<1>(pPtOps->at(iOperOG-1))));
+				else if(pHexPtOps && bIsHex)
+					prop.put(strPath + "og.ops.R" + std::to_string(iPtOp+1), to_str(std::get<1>(pHexPtOps->at(iOperOG-1))));
+				else
+					prop.put(strPath + "og.ops.R" + std::to_string(iPtOp+1), iOperOG);
+				prop.put(strPath + "og.ops.v" + std::to_string(iPtOp+1), to_str(vecOG));
+				prop.put(strPath + "og.ops.d" + std::to_string(iPtOp+1), numOG);
+				prop.put(strPath + "og.ops.t" + std::to_string(iPtOp+1), itInvOG);
+			}
 		}
 
 		std::size_t iNumLattVecsOG = get_num<std::size_t>(istr);
@@ -296,8 +301,11 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 			t_vec vecOG = get_vector(3, istr);
 			t_real numOG = get_num<t_real>(istr);
 
-			prop.put(strPath + "og.latt.v" + std::to_string(iVec+1), to_str(vecOG));
-			prop.put(strPath + "og.latt.d" + std::to_string(iVec+1), numOG);
+			if(bSaveOG)
+			{
+				prop.put(strPath + "og.latt.v" + std::to_string(iVec+1), to_str(vecOG));
+				prop.put(strPath + "og.latt.d" + std::to_string(iVec+1), numOG);
+			}
 		}
 
 		std::size_t iNumWycOG = get_num<std::size_t>(istr);
@@ -307,8 +315,11 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 			std::size_t iMult = get_num<std::size_t>(istr);
 			std::string strWycName = get_string(istr);
 
-			prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1) + ".l", strWycName);
-			prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1) + ".m", iMult);
+			if(bSaveOG)
+			{
+				prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1) + ".l", strWycName);
+				prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1) + ".m", iMult);
+			}
 
 			for(std::size_t iPos=0; iPos<iNumPos; ++iPos)
 			{
@@ -317,14 +328,17 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 				t_mat matWycXYZ = get_matrix(3, 3, istr);
 				t_mat matWycMXMYMZ = get_matrix(3, 3, istr);
 
-				prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
-					+ ".v" + std::to_string(iPos+1) , to_str(vecWyc));
-				prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
-					+ ".d" + std::to_string(iPos+1) , numWyc);
-				prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
-					+ ".R" + std::to_string(iPos+1) , to_str(matWycXYZ));
-				prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
-					+ ".M" + std::to_string(iPos+1), to_str(matWycMXMYMZ));
+				if(bSaveOG)
+				{
+					prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
+						+ ".v" + std::to_string(iPos+1) , to_str(vecWyc));
+					prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
+						+ ".d" + std::to_string(iPos+1) , numWyc);
+					prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
+						+ ".R" + std::to_string(iPos+1) , to_str(matWycXYZ));
+					prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
+						+ ".M" + std::to_string(iPos+1), to_str(matWycMXMYMZ));
+				}
 			}
 		}
 	}
@@ -379,6 +393,7 @@ void convert_table(const char* pcFile)
 
 int main()
 {
+	bSaveOG = false;
 	convert_table("mag.dat");
 
 	return 0;
