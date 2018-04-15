@@ -18,7 +18,8 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/xml_parser.hpp>
+#include <boost/property_tree/info_parser.hpp>
+//#include <boost/property_tree/xml_parser.hpp>
 namespace ptree = boost::property_tree;
 
 
@@ -217,7 +218,8 @@ bool Spacegroups<t_mat, t_vec>::Load(const std::string& strFile)
 	ptree::ptree prop;
 	try
 	{
-		ptree::read_xml(strFile, prop);
+		//ptree::read_xml(strFile, prop);
+		ptree::read_info(strFile, prop);
 	}
 	catch(const std::exception& ex)
 	{
@@ -238,15 +240,15 @@ bool Spacegroups<t_mat, t_vec>::Load(const std::string& strFile)
 	for(const auto& group : *groups)
 	{
 		// --------------------------------------------------------------------
-		auto nameBNS = group.second.get_optional<std::string>("bns.name");
+		auto nameBNS = group.second.get_optional<std::string>("bns.id");
 		auto nrBNS = group.second.get_optional<std::string>("bns.nr");
-		const auto& lattBNS = group.second.get_child_optional("bns.latt");
+		const auto& lattBNS = group.second.get_child_optional("bns.lat");
 		const auto& opsBNS = group.second.get_child_optional("bns.ops");
 		const auto& wycBNS = group.second.get_child_optional("bns.wyc");
 
-		auto nameOG = group.second.get_optional<std::string>("og.name");
+		auto nameOG = group.second.get_optional<std::string>("og.id");
 		auto nrOG = group.second.get_optional<std::string>("og.nr");
-		const auto& lattOG = group.second.get_child_optional("og.latt");
+		const auto& lattOG = group.second.get_child_optional("og.lat");
 		const auto& opsOG = group.second.get_child_optional("og.ops");
 		const auto& wycOG = group.second.get_child_optional("og.wyc");
 
@@ -288,9 +290,28 @@ bool Spacegroups<t_mat, t_vec>::Load(const std::string& strFile)
 		{
 			t_vec vec = m::zero<t_vec>(3);
 
-			std::istringstream istr(str);
-			for(std::size_t i=0; i<vec.size(); ++i)
-				istr >> vec[i];
+			// abbreviations
+			if(str == "0")
+				;
+			else if(str == "x")
+				vec = m::create<t_vec>({1,0,0});
+			else if(str == "y")
+				vec = m::create<t_vec>({0,1,0});
+			else if(str == "z")
+				vec = m::create<t_vec>({0,0,1});
+			else if(str == "-x")
+				vec = m::create<t_vec>({-1,0,0});
+			else if(str == "-y")
+				vec = m::create<t_vec>({0,-1,0});
+			else if(str == "-z")
+				vec = m::create<t_vec>({0,0,-1});
+			else
+			{
+				// read vector
+				std::istringstream istr(str);
+				for(std::size_t i=0; i<vec.size(); ++i)
+					istr >> vec[i];
+			}
 
 			return vec;
 		};
@@ -300,12 +321,21 @@ bool Spacegroups<t_mat, t_vec>::Load(const std::string& strFile)
 		{
 			t_mat mat = m::zero<t_mat>(3,3);
 
-			std::istringstream istr(str);
-			for(std::size_t i=0; i<mat.size1(); ++i)
-				for(std::size_t j=0; j<mat.size2(); ++j)
-					istr >> mat(i,j);
+			// abbreviations
+			if(str == "0")
+				;
+			else if(str == "1")
+				mat = m::unit<t_mat>(3);
+			else
+			{
+				// read matrix
+				std::istringstream istr(str);
+				for(std::size_t i=0; i<mat.size1(); ++i)
+					for(std::size_t j=0; j<mat.size2(); ++j)
+						istr >> mat(i,j);
+			}
 
-				return mat;
+			return mat;
 		};
 
 		// transforms a BNS vector to OG
@@ -470,7 +500,7 @@ bool Spacegroups<t_mat, t_vec>::Load(const std::string& strFile)
 
 			for(std::size_t iWyc=1; true; ++iWyc)
 			{
-				std::string nameSite = "site" + std::to_string(iWyc);
+				std::string nameSite = "s" + std::to_string(iWyc);
 				auto wyc = wycs->get_child_optional(nameSite);
 				if(!wyc) break;
 

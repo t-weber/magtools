@@ -17,11 +17,14 @@
 namespace ublas = boost::numeric::ublas;
 
 #include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/xml_parser.hpp>
+//#include <boost/property_tree/xml_parser.hpp>
+#include <boost/property_tree/info_parser.hpp>
 namespace ptree = boost::property_tree;
 
 #include <boost/algorithm/string/trim.hpp>
 namespace algo = boost::algorithm;
+
+#include "libs/math_algos.h"
 
 
 using t_real = double;
@@ -29,10 +32,20 @@ using t_mat = ublas::matrix<t_real>;
 using t_vec = ublas::vector<t_real>;
 
 
-bool bSaveOG = true;
+bool bSaveOG = false;
 
 std::string to_str(const t_mat& mat)
 {
+	// special cases
+	static const auto zero = m::zero<t_mat>(mat.size1(), mat.size2());
+	static const auto unit = m::unit<t_mat>(mat.size1(), mat.size2());
+
+	if(m::equals<t_mat>(mat, zero))
+		return "0";
+	else if(m::equals<t_mat>(mat, unit))
+		return "1";
+
+	// general case
 	std::ostringstream ostr;
 
 	for(std::size_t i=0; i<mat.size1(); ++i)
@@ -53,6 +66,31 @@ std::string to_str(const t_mat& mat)
 
 std::string to_str(const t_vec& vec)
 {
+	// spacial cases
+	static const auto zero = m::zero<t_vec>(vec.size());
+	static const auto x = m::create<t_vec>({1,0,0});
+	static const auto y = m::create<t_vec>({0,1,0});
+	static const auto z = m::create<t_vec>({0,0,1});
+	static const auto mx = m::create<t_vec>({-1,0,0});
+	static const auto my = m::create<t_vec>({0,-1,0});
+	static const auto mz = m::create<t_vec>({0,0,-1});
+
+	if(m::equals<t_vec>(vec, zero))
+		return "0";
+	else if(m::equals<t_vec>(vec, x))
+		return "x";
+	else if(m::equals<t_vec>(vec, y))
+		return "y";
+	else if(m::equals<t_vec>(vec, z))
+		return "z";
+	else if(m::equals<t_vec>(vec, mx))
+		return "-x";
+	else if(m::equals<t_vec>(vec, my))
+		return "-y";
+	else if(m::equals<t_vec>(vec, mz))
+		return "-z";
+
+	// general case
 	std::ostringstream ostr;
 
 	for(std::size_t i=0; i<vec.size(); ++i)
@@ -177,8 +215,8 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 	std::string strNrOG = get_string(istr);
 	std::string strSGOG = get_string(istr);
 
-	prop.put(strPath + "bns.name", strSGBNS);
-	prop.put(strPath + "og.name", strSGOG);
+	prop.put(strPath + "bns.id", strSGBNS);
+	prop.put(strPath + "og.id", strSGOG);
 
 	std::ostringstream ostrNrBNS, ostrNrOG;
 	ostrNrBNS << iNrBNS[0] << "." << iNrBNS[1];
@@ -238,8 +276,8 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 		t_vec vecBNS = get_vector(3, istr);
 		t_real numBNS = get_num<t_real>(istr);
 
-		prop.put(strPath + "bns.latt.v" + std::to_string(iVec+1), to_str(vecBNS));
-		prop.put(strPath + "bns.latt.d" + std::to_string(iVec+1), numBNS);
+		prop.put(strPath + "bns.lat.v" + std::to_string(iVec+1), to_str(vecBNS));
+		prop.put(strPath + "bns.lat.d" + std::to_string(iVec+1), numBNS);
 	}
 
 	std::size_t iNumWycBNS = get_num<std::size_t>(istr);
@@ -249,8 +287,8 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 		std::size_t iMult = get_num<std::size_t>(istr);
 		std::string strWycName = get_string(istr);
 
-		prop.put(strPath + "bns.wyc.site" + std::to_string(iWyc+1) + ".l", strWycName);
-		prop.put(strPath + "bns.wyc.site" + std::to_string(iWyc+1) + ".m", iMult);
+		prop.put(strPath + "bns.wyc.s" + std::to_string(iWyc+1) + ".l", strWycName);
+		prop.put(strPath + "bns.wyc.s" + std::to_string(iWyc+1) + ".m", iMult);
 
 		for(std::size_t iPos=0; iPos<iNumPos; ++iPos)
 		{
@@ -259,13 +297,13 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 			t_mat matWycXYZ = get_matrix(3, 3, istr);
 			t_mat matWycMXMYMZ = get_matrix(3, 3, istr);
 
-			prop.put(strPath + "bns.wyc.site" + std::to_string(iWyc+1)
+			prop.put(strPath + "bns.wyc.s" + std::to_string(iWyc+1)
 				+ ".v" + std::to_string(iPos+1), to_str(vecWyc));
-			prop.put(strPath + "bns.wyc.site" + std::to_string(iWyc+1)
+			prop.put(strPath + "bns.wyc.s" + std::to_string(iWyc+1)
 				+ ".d" + std::to_string(iPos+1), numWyc);
-			prop.put(strPath + "bns.wyc.site" + std::to_string(iWyc+1)
+			prop.put(strPath + "bns.wyc.s" + std::to_string(iWyc+1)
 				+ ".R" + std::to_string(iPos+1), to_str(matWycXYZ));
-			prop.put(strPath + "bns.wyc.site" + std::to_string(iWyc+1)
+			prop.put(strPath + "bns.wyc.s" + std::to_string(iWyc+1)
 				+ ".M" + std::to_string(iPos+1), to_str(matWycMXMYMZ));
 		}
 	}
@@ -303,8 +341,8 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 
 			if(bSaveOG)
 			{
-				prop.put(strPath + "og.latt.v" + std::to_string(iVec+1), to_str(vecOG));
-				prop.put(strPath + "og.latt.d" + std::to_string(iVec+1), numOG);
+				prop.put(strPath + "og.lat.v" + std::to_string(iVec+1), to_str(vecOG));
+				prop.put(strPath + "og.lat.d" + std::to_string(iVec+1), numOG);
 			}
 		}
 
@@ -317,8 +355,8 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 
 			if(bSaveOG)
 			{
-				prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1) + ".l", strWycName);
-				prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1) + ".m", iMult);
+				prop.put(strPath + "og.wyc.s" + std::to_string(iWyc+1) + ".l", strWycName);
+				prop.put(strPath + "og.wyc.s" + std::to_string(iWyc+1) + ".m", iMult);
 			}
 
 			for(std::size_t iPos=0; iPos<iNumPos; ++iPos)
@@ -330,13 +368,13 @@ void convert_spacegroup(std::istream& istr, ptree::ptree& prop, const std::strin
 
 				if(bSaveOG)
 				{
-					prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
+					prop.put(strPath + "og.wyc.s" + std::to_string(iWyc+1)
 						+ ".v" + std::to_string(iPos+1) , to_str(vecWyc));
-					prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
+					prop.put(strPath + "og.wyc.s" + std::to_string(iWyc+1)
 						+ ".d" + std::to_string(iPos+1) , numWyc);
-					prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
+					prop.put(strPath + "og.wyc.s" + std::to_string(iWyc+1)
 						+ ".R" + std::to_string(iPos+1) , to_str(matWycXYZ));
-					prop.put(strPath + "og.wyc.site" + std::to_string(iWyc+1)
+					prop.put(strPath + "og.wyc.s" + std::to_string(iWyc+1)
 						+ ".M" + std::to_string(iPos+1), to_str(matWycMXMYMZ));
 				}
 			}
@@ -385,16 +423,17 @@ void convert_table(const char* pcFile)
 	std::cout << "\n";
 
 
-	ptree::write_xml("magsg.xml", prop,
+	/*ptree::write_xml("magsg.xml", prop,
 		std::locale(),
-		ptree::xml_writer_make_settings('\t', 1, std::string("utf-8")));
+		ptree::xml_writer_make_settings('\t', 1, std::string("utf-8")));*/
+	ptree::write_info("magsg.info", prop,
+		std::locale(),
+		ptree::info_writer_make_settings('\t', 1));
 }
 
 
 int main()
 {
-	bSaveOG = false;
 	convert_table("mag.dat");
-
 	return 0;
 }

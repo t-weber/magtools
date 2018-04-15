@@ -11,6 +11,8 @@
 #include "math_concepts.h"
 #include <cassert>
 #include <vector>
+#include <iostream>
+#include <iomanip>
 
 
 namespace m {

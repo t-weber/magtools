@@ -67,7 +67,7 @@ SgBrowserDlg::SgBrowserDlg(QWidget* pParent, QSettings *pSett)
 void SgBrowserDlg::SetupSpaceGroups()
 {
 	std::cerr << "Loading space groups ... ";
-	m_sgs.Load("../magsg.xml");
+	m_sgs.Load("../magsg.info");
 	std::cerr << "Done." << std::endl;
 
 	const auto *pSgs = m_sgs.GetSpacegroups();
@@ -147,6 +147,11 @@ void SgBrowserDlg::SwitchToBNS(bool bBNS)
 void SgBrowserDlg::SpaceGroupSelected(QTreeWidgetItem *pItem)
 {
 	if(!pItem) return;
+
+	// clean up
+	m_pSymOps->clear();
+	m_pWyc->clear();
+
 	int iNrStruct = pItem->data(0, Qt::UserRole).toInt();
 	int iNrMag = pItem->data(0, Qt::UserRole+1).toInt();
 
@@ -218,8 +223,6 @@ void SgBrowserDlg::SpaceGroupSelected(QTreeWidgetItem *pItem)
 
 
 	// iterate over symmetries
-	m_pSymOps->clear();
-
 	const auto *symms = pSg->GetSymmetries(m_showBNS);
 	if(symms)
 	{
@@ -237,7 +240,6 @@ void SgBrowserDlg::SpaceGroupSelected(QTreeWidgetItem *pItem)
 
 
 	// iterate over wyckoff positions
-	m_pWyc->clear();
 	const auto *wycs = pSg->GetWycPositions(m_showBNS);
 	if(wycs)
 	{
@@ -259,6 +261,7 @@ void SgBrowserDlg::SpaceGroupSelected(QTreeWidgetItem *pItem)
 			}
 
 			m_pWyc->addTopLevelItem(pWycItem);
+			pWycItem->setExpanded(true);
 		}
 	}
 }
