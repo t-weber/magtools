@@ -3,7 +3,7 @@
  * @author Tobias Weber
  * @date Nov-2017
  * @license: see 'LICENSE.GPL' file
- * 
+ *
  *  * References:
  *  * http://doc.qt.io/qt-5/qopenglwidget.html#details
  *  * http://code.qt.io/cgit/qt/qtbase.git/tree/examples/opengl/threadedqopenglwidget
@@ -73,8 +73,8 @@ protected:
 	void updatePicker();
 
 private:
-	bool m_bRunning = false;
 	bool m_bInitialised = false;
+	bool m_bWantsResize = false;
 	GlPlot *m_pPlot = nullptr;
 
 	std::shared_ptr<QOpenGLShaderProgram> m_pShaders;
@@ -103,15 +103,17 @@ private:
 
 public:
 	void SetScreenDims(int w, int h);
-	void SetRunning(bool bRun) { m_bRunning = bRun; };
 
 protected slots:
 	void tick();
 
 public slots:
 	void paintGL();
-	void initializeGL();
+	void initialiseGL();
 	void resizeGL();
+
+	void startedThread();
+	void stoppedThread();
 
 	void mouseMoveEvent(const QPointF& pos);
 };
@@ -126,7 +128,7 @@ public:
 	virtual ~GlPlot();
 
 protected:
-	virtual void paintEvent(QPaintEvent*) override;
+	virtual void paintEvent(QPaintEvent*) override {}; /* empty for threading */
 	virtual void mouseMoveEvent(QMouseEvent *pEvt) override;
 
 protected slots:
@@ -142,7 +144,9 @@ private:
 
 public:
 	QMutex* GetMutex() { return &m_mutex; }
+
 	void MoveContextToThread();
+	bool IsContextInThread() const;
 };
 
 

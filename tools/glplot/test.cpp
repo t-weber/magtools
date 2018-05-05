@@ -19,20 +19,25 @@
 class PltDlg : public QDialog
 {
 private:
-	std::shared_ptr<GlPlot> m_pGlPlot;
+	std::vector<std::shared_ptr<GlPlot>> m_plots;
 
 public:
 	using QDialog::QDialog;
 
-	PltDlg(QWidget* pParent) : QDialog{pParent, Qt::Window}, m_pGlPlot{new GlPlot(this)}
+	PltDlg(QWidget* pParent) : QDialog{pParent, Qt::Window},
+	m_plots{{
+		std::make_shared<GlPlot>(this), std::make_shared<GlPlot>(this),
+		std::make_shared<GlPlot>(this), std::make_shared<GlPlot>(this) }}
 	{
 		setWindowTitle("GlPlot");
-		m_pGlPlot->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
 
 		auto pGrid = new QGridLayout(this);
 		pGrid->setSpacing(2);
 		pGrid->setContentsMargins(4,4,4,4);
-		pGrid->addWidget(m_pGlPlot.get(), 0,0,1,1);
+		pGrid->addWidget(m_plots[0].get(), 0,0, 1,1);
+		pGrid->addWidget(m_plots[1].get(), 0,1, 1,1);
+		pGrid->addWidget(m_plots[2].get(), 1,0, 1,1);
+		pGrid->addWidget(m_plots[3].get(), 1,1, 1,1);
 
 		this->setSizeGripEnabled(true);
 	}

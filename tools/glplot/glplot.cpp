@@ -9,9 +9,6 @@
  *  * http://code.qt.io/cgit/qt/qtbase.git/tree/examples/opengl/threadedqopenglwidget
  */
 
-//
-// !! DOES NOT YET WORK !!
-//
 #include "glplot.h"
 
 #include <QtGui/QOpenGLContext>
@@ -30,11 +27,14 @@ namespace algo = boost::algorithm;
 // error codes: https://www.khronos.org/opengl/wiki/OpenGL_Error
 #define LOGGLERR(pGl) { if(auto err = pGl->glGetError(); err != GL_NO_ERROR) \
 	std::cerr << "gl error in " << __func__ \
-	<< " line " << std::dec <<  __LINE__  << ": " \
-	<< std::hex << err << std::endl; }
+		<< " line " << std::dec <<  __LINE__  << ": " \
+		<< std::hex << err << std::endl; }
 
 
-GlPlot_impl::GlPlot_impl(GlPlot *pPlot) : m_pPlot(pPlot)
+GlPlot_impl::GlPlot_impl(GlPlot *pPlot) : m_pPlot{pPlot},
+	m_matPerspective{m::unit<t_mat_gl>()}, m_matPerspective_inv{m::unit<t_mat_gl>()},
+	m_matViewport{m::unit<t_mat_gl>()}, m_matViewport_inv{m::unit<t_mat_gl>()},
+	m_matCam{m::unit<t_mat_gl>()}, m_matCam_inv{m::unit<t_mat_gl>()}
 {
 	connect(&m_timer, &QTimer::timeout, this, static_cast<void (GlPlot_impl::*)()>(&GlPlot_impl::tick));
 	m_timer.start(std::chrono::milliseconds(1000 / 60));
@@ -44,6 +44,16 @@ GlPlot_impl::GlPlot_impl(GlPlot *pPlot) : m_pPlot(pPlot)
 GlPlot_impl::~GlPlot_impl()
 {
 	m_timer.stop();
+
+}
+
+
+void GlPlot_impl::startedThread()
+{
+}
+
+void GlPlot_impl::stoppedThread()
+{
 }
 
 
@@ -63,7 +73,7 @@ qgl_funcs* GlPlot_impl::GetGlFunctions()
 }
 
 
-void GlPlot_impl::initializeGL()
+void GlPlot_impl::initialiseGL()
 {
 	// --------------------------------------------------------------------
 	// shaders
@@ -123,6 +133,7 @@ void GlPlot_impl::initializeGL()
 
 	// GL functions
 	auto *pGl = GetGlFunctions();
+	if(!pGl) return;
 	std::cerr << __func__ << ": "
 		<< (char*)pGl->glGetString(GL_VERSION) << ", "
 		<< (char*)pGl->glGetString(GL_VENDOR) << ", "
@@ -282,23 +293,6 @@ void GlPlot_impl::resizeGL()
 	auto *pContext = m_pPlot->context();
 	if(!pContext) return;
 
-	QMetaObject::invokeMethod(m_pPlot, &GlPlot::MoveContextToThread, Qt::ConnectionType::BlockingQueuedConnection);
-	m_pPlot->GetMutex()->lock();
-	m_pPlot->makeCurrent();
-	BOOST_SCOPE_EXIT(m_pPlot, pContext)
-	{
-		m_pPlot->doneCurrent();
-		pContext->moveToThread(qGuiApp->thread());
-		m_pPlot->GetMutex()->unlock();
-
-		//QMetaObject::invokeMethod(m_pPlot, static_cast<void (QOpenGLWidget::*)()>(&QOpenGLWidget::update),
-		//	Qt::ConnectionType::QueuedConnection);
-	}
-	BOOST_SCOPE_EXIT_END
-
-	if(!m_bInitialised) initializeGL();
-
-
 	std::cerr << std::dec << __func__ << ": w = " << w << ", h = " << h << std::endl;
 	m_matViewport = m::hom_viewport<t_mat_gl>(w, h, 0., 1.);
 	std::tie(m_matViewport_inv, std::ignore) = m::inv<t_mat_gl>(m_matViewport);
@@ -320,22 +314,33 @@ void GlPlot_impl::resizeGL()
 	m_pShaders->setUniformValue(m_uniMatrixCam, m_matCam);
 	m_pShaders->setUniformValue(m_uniMatrixProj, m_matPerspective);
 	LOGGLERR(pGl);
+
+	m_bWantsResize = false;
 }
 
 
 void GlPlot_impl::paintGL()
 {
-	if(!m_bRunning) return;
+	QThread *pThisThread = QThread::currentThread();
+	if(!pThisThread->isRunning() || pThisThread->isInterruptionRequested())
+		return;
+
 	auto *pContext = m_pPlot->context();
 	if(!pContext) return;
 
 	QMetaObject::invokeMethod(m_pPlot, &GlPlot::MoveContextToThread, Qt::ConnectionType::BlockingQueuedConnection);
+	if(!m_pPlot->IsContextInThread())
+	{
+		std::cerr << __func__ << ": Context is not in thread!" << std::endl;
+		return;
+	}
+
 	m_pPlot->GetMutex()->lock();
 	m_pPlot->makeCurrent();
-	BOOST_SCOPE_EXIT(m_pPlot, pContext)
+	BOOST_SCOPE_EXIT(m_pPlot)
 	{
 		m_pPlot->doneCurrent();
-		pContext->moveToThread(qGuiApp->thread());
+		m_pPlot->context()->moveToThread(qGuiApp->thread());
 		m_pPlot->GetMutex()->unlock();
 
 		QMetaObject::invokeMethod(m_pPlot, static_cast<void (QOpenGLWidget::*)()>(&QOpenGLWidget::update),
@@ -343,86 +348,73 @@ void GlPlot_impl::paintGL()
 	}
 	BOOST_SCOPE_EXIT_END
 
-	if(!m_bInitialised) initializeGL();
+	if(!m_bInitialised)
+		initialiseGL();
+	if(!m_bInitialised)
+	{
+		std::cerr << "Cannot initialise GL." << std::endl;
+		return;
+	}
+
+	if(m_bWantsResize)
+		resizeGL();
+
 
 
 	auto *pGl = GetGlFunctions();
-	//QPainter painter(m_pPlot);
+
+	// clear
+	pGl->glClearColor(1., 1., 1., 1.);
+	pGl->glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	pGl->glEnable(GL_DEPTH_TEST);
 
 
-	// gl painting
+	// bind shaders
+	m_pShaders->bind();
+	BOOST_SCOPE_EXIT(m_pShaders) { m_pShaders->release(); } BOOST_SCOPE_EXIT_END
+	LOGGLERR(pGl);
+
+
+	// set cam matrix
+	m_pShaders->setUniformValue(m_uniMatrixCam, m_matCam);
+
+	// triangle geometry
+	if(m_pvertexbuf)
 	{
-		/*painter.beginNativePainting();
-		BOOST_SCOPE_EXIT(&painter) { painter.endNativePainting(); } BOOST_SCOPE_EXIT_END*/
+		// main vertex array object
+		pGl->glBindVertexArray(m_vertexarr[0]);
 
-		// clear
-		pGl->glClearColor(1., 1., 1., 1.);
-		pGl->glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		pGl->glEnable(GL_DEPTH_TEST);
-
-
-		// bind shaders
-		m_pShaders->bind();
-		BOOST_SCOPE_EXIT(m_pShaders) { m_pShaders->release(); } BOOST_SCOPE_EXIT_END
+		pGl->glEnableVertexAttribArray(m_attrVertex);
+		pGl->glEnableVertexAttribArray(m_attrVertexNormal);
+		pGl->glEnableVertexAttribArray(m_attrVertexColor);
+		BOOST_SCOPE_EXIT(pGl, &m_attrVertex, &m_attrVertexNormal, &m_attrVertexColor)
+		{
+			pGl->glDisableVertexAttribArray(m_attrVertexColor);
+			pGl->glDisableVertexAttribArray(m_attrVertexNormal);
+			pGl->glDisableVertexAttribArray(m_attrVertex);
+		}
+		BOOST_SCOPE_EXIT_END
 		LOGGLERR(pGl);
 
-
-		// set cam matrix
-		m_pShaders->setUniformValue(m_uniMatrixCam, m_matCam);
-
-		// triangle geometry
-		if(m_pvertexbuf)
-		{
-			// main vertex array object
-			pGl->glBindVertexArray(m_vertexarr[0]);
-
-			pGl->glEnableVertexAttribArray(m_attrVertex);
-			pGl->glEnableVertexAttribArray(m_attrVertexNormal);
-			pGl->glEnableVertexAttribArray(m_attrVertexColor);
-			BOOST_SCOPE_EXIT(pGl, &m_attrVertex, &m_attrVertexNormal, &m_attrVertexColor)
-			{
-				pGl->glDisableVertexAttribArray(m_attrVertexColor);
-				pGl->glDisableVertexAttribArray(m_attrVertexNormal);
-				pGl->glDisableVertexAttribArray(m_attrVertex);
-			}
-			BOOST_SCOPE_EXIT_END
-			LOGGLERR(pGl);
-
-			pGl->glDrawArrays(GL_TRIANGLES, 0, m_triangles.size());
-			LOGGLERR(pGl);
-		}
-
-		// lines
-		if(m_plinebuf)
-		{
-			// auxiliary vertex array object
-			pGl->glBindVertexArray(m_vertexarr[1]);
-
-			pGl->glEnableVertexAttribArray(m_attrVertex);
-			BOOST_SCOPE_EXIT(pGl, &m_attrVertex)
-			{ pGl->glDisableVertexAttribArray(m_attrVertex); }
-			BOOST_SCOPE_EXIT_END
-			LOGGLERR(pGl);
-
-			pGl->glDrawArrays(GL_LINES, 0, m_lines.size());
-			LOGGLERR(pGl);
-		}
+		pGl->glDrawArrays(GL_TRIANGLES, 0, m_triangles.size());
+		LOGGLERR(pGl);
 	}
 
-	// classic painting
-	/*{
-		pGl->glDisable(GL_DEPTH_TEST);
+	// lines
+	if(m_plinebuf)
+	{
+		// auxiliary vertex array object
+		pGl->glBindVertexArray(m_vertexarr[1]);
 
-		std::size_t i = 0;
-		for(const auto& vert : m_vertices)
-		{
-			std::string strName = "* " + std::to_string(i);
-			painter.drawText(GlToScreenCoords(t_vec_gl(vert[0], vert[1], vert[2], 1)), strName.c_str());
-			++i;
-		}
-	}*/
+		pGl->glEnableVertexAttribArray(m_attrVertex);
+		BOOST_SCOPE_EXIT(pGl, &m_attrVertex)
+		{ pGl->glDisableVertexAttribArray(m_attrVertex); }
+		BOOST_SCOPE_EXIT_END
+		LOGGLERR(pGl);
 
-	//std::cout << "paintGL" << std::endl;
+		pGl->glDrawArrays(GL_LINES, 0, m_lines.size());
+		LOGGLERR(pGl);
+	}
 }
 
 
@@ -441,8 +433,8 @@ void GlPlot_impl::tick(const std::chrono::milliseconds& ms)
 	std::tie(m_matCam_inv, std::ignore) = m::inv<t_mat_gl>(m_matCam);
 
 	updatePicker();
-	QMetaObject::invokeMethod(m_pPlot, static_cast<void (QOpenGLWidget::*)()>(&QOpenGLWidget::update),
-		Qt::ConnectionType::QueuedConnection);
+	//QMetaObject::invokeMethod(m_pPlot, static_cast<void (QOpenGLWidget::*)()>(&QOpenGLWidget::update),
+	//	Qt::ConnectionType::QueuedConnection);
 }
 
 
@@ -473,7 +465,7 @@ void GlPlot_impl::mouseMoveEvent(const QPointF& pos)
 
 void GlPlot_impl::updatePicker()
 {
-	if(!m_bInitialised || !m_bRunning || !m_pcolorbuf) return;
+	if(!m_bInitialised || !m_pcolorbuf) return;
 
 	m_pcolorbuf->bind();
 	BOOST_SCOPE_EXIT(&m_pcolorbuf) { m_pcolorbuf->release(); } BOOST_SCOPE_EXIT_END
@@ -505,7 +497,9 @@ void GlPlot_impl::SetScreenDims(int w, int h)
 {
 	m_iScreenDims[0] = w;
 	m_iScreenDims[1] = h;
+	m_bWantsResize = true;
 }
+
 
 
 // ----------------------------------------------------------------------------
@@ -522,15 +516,20 @@ GlPlot::GlPlot(QWidget *pParent) : QOpenGLWidget(pParent),
 	connect(this, &QOpenGLWidget::aboutToResize, this, &GlPlot::beforeResizing);
 	connect(this, &QOpenGLWidget::resized, this, &GlPlot::afterResizing);
 
+	connect(m_thread_impl.get(), &QThread::started, m_impl.get(), &GlPlot_impl::startedThread);
+	connect(m_thread_impl.get(), &QThread::finished, m_impl.get(), &GlPlot_impl::stoppedThread);
+
 	m_thread_impl->start();
 	setMouseTracking(true);
-	m_impl->SetRunning(true);
 }
+
 
 GlPlot::~GlPlot()
 {
-	m_impl->SetRunning(false);
-	m_thread_impl->quit();
+	setMouseTracking(false);
+
+	m_thread_impl->requestInterruption();
+	m_thread_impl->exit();
 	m_thread_impl->wait();
 }
 
@@ -541,6 +540,9 @@ void GlPlot::mouseMoveEvent(QMouseEvent *pEvt)
 }
 
 
+/**
+ * move the GL context to the associated thread
+ */
 void GlPlot::MoveContextToThread()
 {
 	auto *pContext = context();
@@ -549,11 +551,17 @@ void GlPlot::MoveContextToThread()
 }
 
 
-void GlPlot::paintEvent(QPaintEvent *pEvt)
+/**
+ * does the GL context run in the current thread?
+ */
+bool GlPlot::IsContextInThread() const
 {
-	// empty for threaded painting
-	//QOpenGLWidget::paintEvent(pEvt);
+	auto *pContext = context();
+	if(!pContext) return false;
+
+	return pContext->thread() == m_thread_impl.get();
 }
+
 
 /**
  * main thread wants to compose -> wait for sub-threads to be finished
@@ -591,8 +599,6 @@ void GlPlot::afterResizing()
 
 	const int w = width(), h = height();
 	m_impl->SetScreenDims(w, h);
-
-	QMetaObject::invokeMethod(m_impl.get(), &GlPlot_impl::resizeGL, Qt::ConnectionType::QueuedConnection);
 }
 
 // ----------------------------------------------------------------------------
