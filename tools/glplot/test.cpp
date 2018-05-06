@@ -25,9 +25,7 @@ public:
 	using QDialog::QDialog;
 
 	PltDlg(QWidget* pParent) : QDialog{pParent, Qt::Window},
-	m_plots{{
-		std::make_shared<GlPlot>(this), std::make_shared<GlPlot>(this),
-		std::make_shared<GlPlot>(this), std::make_shared<GlPlot>(this) }}
+	m_plots{{ std::make_shared<GlPlot>(this), std::make_shared<GlPlot>(this) }}
 	{
 		setWindowTitle("GlPlot");
 
@@ -36,8 +34,6 @@ public:
 		pGrid->setContentsMargins(4,4,4,4);
 		pGrid->addWidget(m_plots[0].get(), 0,0, 1,1);
 		pGrid->addWidget(m_plots[1].get(), 0,1, 1,1);
-		pGrid->addWidget(m_plots[2].get(), 1,0, 1,1);
-		pGrid->addWidget(m_plots[3].get(), 1,1, 1,1);
 
 		this->setSizeGripEnabled(true);
 	}

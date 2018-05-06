@@ -73,6 +73,104 @@ qgl_funcs* GlPlot_impl::GetGlFunctions()
 }
 
 
+GlPlotObj GlPlot_impl::CreateObject(const std::vector<t_vec3_gl>& verts,
+	const std::vector<t_vec3_gl>& triagverts, const std::vector<t_vec3_gl>& norms)
+{
+	qgl_funcs* pGl = GetGlFunctions();
+	GLint attrVertex = m_attrVertex;
+	GLint attrVertexNormal = m_attrVertexNormal;
+	GLint attrVertexColor = m_attrVertexColor;
+
+	GlPlotObj obj;
+
+	// flatten vertex array into raw float array
+	auto to_float_array = [](const std::vector<t_vec3_gl>& verts, int iRepeat=1, int iElems=3)
+		-> std::vector<GLfloat>
+	{
+		std::vector<GLfloat> vecRet;
+		vecRet.reserve(iRepeat*verts.size()*iElems);
+
+		for(const t_vec3_gl& vert : verts)
+			for(int i=0; i<iRepeat; ++i)
+				for(int iElem=0; iElem<iElems; ++iElem)
+					vecRet.push_back(vert[iElem]);
+
+		return vecRet;
+	};
+
+	// main vertex array object
+	pGl->glGenVertexArrays(1, &obj.m_vertexarr);
+	pGl->glBindVertexArray(obj.m_vertexarr);
+
+	{	// vertices
+		obj.m_pvertexbuf = std::make_shared<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
+
+		obj.m_pvertexbuf->create();
+		obj.m_pvertexbuf->bind();
+		BOOST_SCOPE_EXIT(&obj) { obj.m_pvertexbuf->release(); } BOOST_SCOPE_EXIT_END
+
+		auto vecVerts = to_float_array(triagverts);
+		obj.m_pvertexbuf->allocate(vecVerts.data(), vecVerts.size()*sizeof(typename decltype(vecVerts)::value_type));
+		pGl->glVertexAttribPointer(attrVertex, 3, GL_FLOAT, 0, 0, (void*)(0*sizeof(typename decltype(vecVerts)::value_type)));
+	}
+
+	{	// normals
+		obj.m_pnormalsbuf = std::make_shared<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
+
+		obj.m_pnormalsbuf->create();
+		obj.m_pnormalsbuf->bind();
+		BOOST_SCOPE_EXIT(&obj) { obj.m_pnormalsbuf->release(); } BOOST_SCOPE_EXIT_END
+
+		auto vecNorms = to_float_array(norms, 3);
+		obj.m_pnormalsbuf->allocate(vecNorms.data(), vecNorms.size()*sizeof(typename decltype(vecNorms)::value_type));
+		pGl->glVertexAttribPointer(attrVertexNormal, 3, GL_FLOAT, 0, 0, (void*)(0*sizeof(typename decltype(vecNorms)::value_type)));
+	}
+
+	{	// colors
+		obj.m_pcolorbuf = std::make_shared<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
+
+		obj.m_pcolorbuf->create();
+		obj.m_pcolorbuf->bind();
+		BOOST_SCOPE_EXIT(&obj) { obj.m_pcolorbuf->release(); } BOOST_SCOPE_EXIT_END
+
+		std::vector<GLfloat> vecCols;
+		vecCols.reserve(4*triagverts.size());
+		for(std::size_t iVert=0; iVert<triagverts.size(); ++iVert)
+		{
+			for(int icol=0; icol<sizeof(obj.m_color)/sizeof(obj.m_color[0]); ++icol)
+				vecCols.push_back(obj.m_color[icol]);
+		}
+
+		obj.m_pcolorbuf->allocate(vecCols.data(), vecCols.size()*sizeof(typename decltype(vecCols)::value_type));
+		pGl->glVertexAttribPointer(attrVertexColor, 4, GL_FLOAT, 0, 0, (void*)(0*sizeof(typename decltype(vecCols)::value_type)));
+	}
+
+
+	obj.m_vertices = std::move(verts);
+	obj.m_triangles = std::move(triagverts);
+
+	return obj;
+}
+
+
+GlPlotObj GlPlot_impl::CreateSphere(t_real_gl rad, t_real_gl x, t_real_gl y, t_real_gl z)
+{
+	auto solid = m::create_icosahedron<t_vec3_gl>(1);
+	auto [triagverts, norms, uvs] = m::spherify<t_vec3_gl>(
+		m::subdivide_triangles<t_vec3_gl>(
+			m::create_triangles<t_vec3_gl>(solid), 2), rad);
+
+	auto obj = CreateObject(std::get<0>(solid), triagverts, norms);
+
+	obj.m_mat(0,3) = x;
+	obj.m_mat(1,3) = y;
+	obj.m_mat(2,3) = z;
+
+	return obj;
+}
+
+
+
 void GlPlot_impl::initialiseGL()
 {
 	// --------------------------------------------------------------------
@@ -103,6 +201,7 @@ void GlPlot_impl::initialiseGL()
 
 		uniform mat4 proj = mat4(1.);
 		uniform mat4 cam = mat4(1.);
+		uniform mat4 obj = mat4(1.);
 
 		//vec4 vertexcolor = vec4(0, 0, 1, 1);
 		vec3 light_dir = vec3(2, 2, -1);
@@ -116,7 +215,7 @@ void GlPlot_impl::initialiseGL()
 
 		void main()
 		{
-			gl_Position = proj * cam * vertex;
+			gl_Position = proj * cam * obj * vertex;
 
 			float I = lighting(light_dir);
 			fragcolor = vertexcolor * I;
@@ -174,105 +273,22 @@ void GlPlot_impl::initialiseGL()
 
 		m_uniMatrixCam = m_pShaders->uniformLocation("cam");
 		m_uniMatrixProj = m_pShaders->uniformLocation("proj");
+		m_uniMatrixObj = m_pShaders->uniformLocation("obj");
 		m_attrVertex = m_pShaders->attributeLocation("vertex");
 		m_attrVertexNormal = m_pShaders->attributeLocation("normal");
 		m_attrVertexColor = m_pShaders->attributeLocation("vertexcolor");
 	}
 	LOGGLERR(pGl);
 
-	// flatten vertex array into raw float array
-	auto to_float_array = [](const std::vector<t_vec3_gl>& verts, int iRepeat=1, int iElems=3)
-		-> std::vector<GLfloat>
-	{
-		std::vector<GLfloat> vecRet;
-		vecRet.reserve(iRepeat*verts.size()*iElems);
-
-		for(const t_vec3_gl& vert : verts)
-			for(int i=0; i<iRepeat; ++i)
-				for(int iElem=0; iElem<iElems; ++iElem)
-					vecRet.push_back(vert[iElem]);
-		return vecRet;
-	};
 
 	// geometries
 	{
-		auto solid = m::create_icosahedron<t_vec3_gl>(0.75);
-		auto [verts, norms, uvs] =
-			m::spherify<t_vec3_gl>(
-				m::subdivide_triangles<t_vec3_gl>(
-					m::create_triangles<t_vec3_gl>(solid), 2), 1.);
-		m_lines = m::create_lines<t_vec3_gl>(std::get<0>(solid), std::get<1>(solid));
-
-		// main vertex array object
-		pGl->glGenVertexArrays(2, m_vertexarr.data());
-		pGl->glBindVertexArray(m_vertexarr[0]);
-
-		{	// vertices
-			m_pvertexbuf = std::make_shared<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
-
-			m_pvertexbuf->create();
-			m_pvertexbuf->bind();
-			BOOST_SCOPE_EXIT(&m_pvertexbuf) { m_pvertexbuf->release(); } BOOST_SCOPE_EXIT_END
-
-			auto vecVerts = to_float_array(verts);
-			m_pvertexbuf->allocate(vecVerts.data(), vecVerts.size()*sizeof(typename decltype(vecVerts)::value_type));
-			pGl->glVertexAttribPointer(m_attrVertex, 3, GL_FLOAT, 0, 0, (void*)(0*sizeof(typename decltype(vecVerts)::value_type)));
-		}
-
-		{	// normals
-			m_pnormalsbuf = std::make_shared<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
-
-			m_pnormalsbuf->create();
-			m_pnormalsbuf->bind();
-			BOOST_SCOPE_EXIT(&m_pnormalsbuf)
-			{ m_pnormalsbuf->release(); }
-			BOOST_SCOPE_EXIT_END
-
-			auto vecNorms = to_float_array(norms, 3);
-			m_pnormalsbuf->allocate(vecNorms.data(), vecNorms.size()*sizeof(typename decltype(vecNorms)::value_type));
-			pGl->glVertexAttribPointer(m_attrVertexNormal, 3, GL_FLOAT, 0, 0, (void*)(0*sizeof(typename decltype(vecNorms)::value_type)));
-		}
-
-		{	// colors
-			m_pcolorbuf = std::make_shared<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
-
-			m_pcolorbuf->create();
-			m_pcolorbuf->bind();
-			BOOST_SCOPE_EXIT(&m_pcolorbuf)
-			{ m_pcolorbuf->release(); }
-			BOOST_SCOPE_EXIT_END
-
-			std::vector<GLfloat> vecCols;
-			vecCols.reserve(4*verts.size());
-			for(std::size_t iVert=0; iVert<verts.size(); ++iVert)
-			{
-				vecCols.push_back(0); vecCols.push_back(0);
-				vecCols.push_back(1); vecCols.push_back(1);
-			}
-
-			m_pcolorbuf->allocate(vecCols.data(), vecCols.size()*sizeof(typename decltype(vecCols)::value_type));
-			pGl->glVertexAttribPointer(m_attrVertexColor, 4, GL_FLOAT, 0, 0, (void*)(0*sizeof(typename decltype(vecCols)::value_type)));
-		}
-
-
-		pGl->glBindVertexArray(m_vertexarr[1]);
-
-		{	// lines
-			m_plinebuf = std::make_shared<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
-
-			m_plinebuf->create();
-			m_plinebuf->bind();
-			BOOST_SCOPE_EXIT(&m_plinebuf)
-			{ m_plinebuf->release(); }
-			BOOST_SCOPE_EXIT_END
-
-			auto vecVerts = to_float_array(m_lines);
-			m_plinebuf->allocate(vecVerts.data(), vecVerts.size()*sizeof(typename decltype(vecVerts)::value_type));
-			pGl->glVertexAttribPointer(m_attrVertex, 3, GL_FLOAT, 0, 0, (void*)(0*sizeof(typename decltype(vecVerts)::value_type)));
-		}
-
-		m_vertices = std::move(std::get<0>(solid));
-		m_triangles = std::move(verts);
+		GlPlotObj obj1 = CreateSphere(1., 0., 0., 0.);
+		GlPlotObj obj2 = CreateSphere(0.2, 0., 0., 2.);
+		GlPlotObj obj3 = CreateSphere(0.2, 0., 0., -2.);
+		m_objs.emplace_back(std::move(obj1));
+		m_objs.emplace_back(std::move(obj2));
+		m_objs.emplace_back(std::move(obj3));
 	}
 	LOGGLERR(pGl);
 
@@ -282,6 +298,14 @@ void GlPlot_impl::initialiseGL()
 	pGl->glEnable(GL_CULL_FACE);
 
 	m_bInitialised = true;
+}
+
+
+void GlPlot_impl::SetScreenDims(int w, int h)
+{
+	m_iScreenDims[0] = w;
+	m_iScreenDims[1] = h;
+	m_bWantsResize = true;
 }
 
 
@@ -379,10 +403,12 @@ void GlPlot_impl::paintGL()
 	m_pShaders->setUniformValue(m_uniMatrixCam, m_matCam);
 
 	// triangle geometry
-	if(m_pvertexbuf)
+	for(auto& obj : m_objs)
 	{
 		// main vertex array object
-		pGl->glBindVertexArray(m_vertexarr[0]);
+		pGl->glBindVertexArray(obj.m_vertexarr);
+
+		m_pShaders->setUniformValue(m_uniMatrixObj, obj.m_mat);
 
 		pGl->glEnableVertexAttribArray(m_attrVertex);
 		pGl->glEnableVertexAttribArray(m_attrVertexNormal);
@@ -396,23 +422,7 @@ void GlPlot_impl::paintGL()
 		BOOST_SCOPE_EXIT_END
 		LOGGLERR(pGl);
 
-		pGl->glDrawArrays(GL_TRIANGLES, 0, m_triangles.size());
-		LOGGLERR(pGl);
-	}
-
-	// lines
-	if(m_plinebuf)
-	{
-		// auxiliary vertex array object
-		pGl->glBindVertexArray(m_vertexarr[1]);
-
-		pGl->glEnableVertexAttribArray(m_attrVertex);
-		BOOST_SCOPE_EXIT(pGl, &m_attrVertex)
-		{ pGl->glDisableVertexAttribArray(m_attrVertex); }
-		BOOST_SCOPE_EXIT_END
-		LOGGLERR(pGl);
-
-		pGl->glDrawArrays(GL_LINES, 0, m_lines.size());
+		pGl->glDrawArrays(GL_TRIANGLES, 0, obj.m_triangles.size());
 		LOGGLERR(pGl);
 	}
 }
@@ -465,39 +475,42 @@ void GlPlot_impl::mouseMoveEvent(const QPointF& pos)
 
 void GlPlot_impl::updatePicker()
 {
-	if(!m_bInitialised || !m_pcolorbuf) return;
+	if(!m_bInitialised) return;
 
-	m_pcolorbuf->bind();
-	BOOST_SCOPE_EXIT(&m_pcolorbuf) { m_pcolorbuf->release(); } BOOST_SCOPE_EXIT_END
-	LOGGLERR(GetGlFunctions());
+	auto [org, dir] = m::hom_line_from_screen_coords<t_mat_gl, t_vec_gl>(
+		m_posMouse.x(), m_posMouse.y(), 0., 1., m_matCam_inv,
+		m_matPerspective_inv, m_matViewport_inv, &m_matViewport, true);
 
-	auto [org, dir] = m::hom_line_from_screen_coords<t_mat_gl, t_vec_gl>(m_posMouse.x(), m_posMouse.y(), 0., 1.,
-		m_matCam_inv, m_matPerspective_inv, m_matViewport_inv, &m_matViewport, true);
-
+	// 3 vertices with rgba color
 	GLfloat red[] = {1.,0.,0.,1., 1.,0.,0.,1., 1.,0.,0.,1.};
-	GLfloat blue[] = {0.,0.,1.,1., 0.,0.,1.,1., 0.,0.,1.,1.};
 
-	for(std::size_t startidx=0; startidx+2<m_triangles.size(); startidx+=3)
+	for(auto& obj : m_objs)
 	{
-		std::vector<t_vec3_gl> poly{{ m_triangles[startidx+0], m_triangles[startidx+1], m_triangles[startidx+2] }};
-		auto [vecInters, bInters, lamInters] =
-			m::intersect_line_poly<t_vec3_gl>(
-				t_vec3_gl(org[0], org[1], org[2]), t_vec3_gl(dir[0], dir[1], dir[2]), poly);
-		//if(bInters)
-		//	std::cout << "Intersection with polygon " << startidx/3 << std::endl;
+		GLfloat objcol[4*3];
+		std::copy(obj.m_color+0, obj.m_color+4, objcol+0*4);
+		std::copy(obj.m_color+0, obj.m_color+4, objcol+1*4);
+		std::copy(obj.m_color+0, obj.m_color+4, objcol+2*4);
 
-		if(bInters)
-			m_pcolorbuf->write(sizeof(red[0])*startidx*4, red, sizeof(red));
-		else
-			m_pcolorbuf->write(sizeof(blue[0])*startidx*4, blue, sizeof(blue));
+		obj.m_pcolorbuf->bind();
+		BOOST_SCOPE_EXIT(&obj) { obj.m_pcolorbuf->release(); } BOOST_SCOPE_EXIT_END
+
+		for(std::size_t startidx=0; startidx+2<obj.m_triangles.size(); startidx+=3)
+		{
+			std::vector<t_vec3_gl> poly{{
+				obj.m_triangles[startidx+0],
+				obj.m_triangles[startidx+1],
+				obj.m_triangles[startidx+2] }};
+			auto [vecInters, bInters, lamInters] =
+				m::intersect_line_poly<t_vec3_gl, t_mat_gl>(
+					t_vec3_gl(org[0], org[1], org[2]), t_vec3_gl(dir[0], dir[1], dir[2]),
+					poly, obj.m_mat);
+
+			if(bInters)
+				obj.m_pcolorbuf->write(sizeof(red[0])*startidx*4, red, sizeof(red));
+			else
+				obj.m_pcolorbuf->write(sizeof(objcol[0])*startidx*4, objcol, sizeof(objcol));
+		}
 	}
-}
-
-void GlPlot_impl::SetScreenDims(int w, int h)
-{
-	m_iScreenDims[0] = w;
-	m_iScreenDims[1] = h;
-	m_bWantsResize = true;
 }
 
 

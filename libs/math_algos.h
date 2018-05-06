@@ -1061,6 +1061,27 @@ requires is_vec<t_vec>
 
 
 /**
+ * intersection of a polygon (transformed with a matrix) and a line
+ * returns [position of intersection, intersects?, line parameter lambda]
+ */
+template<class t_vec, class t_mat, template<class ...> class t_cont = std::vector>
+std::tuple<t_vec, bool, typename t_vec::value_type>
+intersect_line_poly(
+	const t_vec& lineOrg, const t_vec& lineDir,
+	const t_cont<t_vec>& _poly, const t_mat& mat)
+requires is_vec<t_vec> && is_mat<t_mat>
+{
+	auto poly = _poly;
+
+	// transform each vertex of the polygon
+	for(t_vec& vec : poly)
+		vec = mat * vec;
+
+	return intersect_line_poly<t_vec, t_cont>(lineOrg, lineDir, poly);
+}
+
+
+/**
  * intersection or closest points of lines |org1> + lam1*|dir1> and |org2> + lam2*|dir2>
  * returns [nearest position 1, nearest position 2, dist, valid?, line parameter 1, line parameter 2]
  *
