@@ -74,7 +74,8 @@ qgl_funcs* GlPlot_impl::GetGlFunctions()
 
 
 GlPlotObj GlPlot_impl::CreateObject(const std::vector<t_vec3_gl>& verts,
-	const std::vector<t_vec3_gl>& triagverts, const std::vector<t_vec3_gl>& norms)
+	const std::vector<t_vec3_gl>& triagverts, const std::vector<t_vec3_gl>& norms,
+	const t_vec_gl& color, bool bUseVertsAsNorm)
 {
 	qgl_funcs* pGl = GetGlFunctions();
 	GLint attrVertex = m_attrVertex;
@@ -82,18 +83,23 @@ GlPlotObj GlPlot_impl::CreateObject(const std::vector<t_vec3_gl>& verts,
 	GLint attrVertexColor = m_attrVertexColor;
 
 	GlPlotObj obj;
+	obj.m_color = color;
 
 	// flatten vertex array into raw float array
-	auto to_float_array = [](const std::vector<t_vec3_gl>& verts, int iRepeat=1, int iElems=3)
-		-> std::vector<GLfloat>
+	auto to_float_array = [](const std::vector<t_vec3_gl>& verts, int iRepeat=1, int iElems=3, bool bNorm=false)
+		-> std::vector<t_real_gl>
 	{
-		std::vector<GLfloat> vecRet;
+		std::vector<t_real_gl> vecRet;
 		vecRet.reserve(iRepeat*verts.size()*iElems);
 
 		for(const t_vec3_gl& vert : verts)
+		{
+			t_real_gl norm = bNorm ? m::norm<t_vec3_gl>(vert) : 1;
+
 			for(int i=0; i<iRepeat; ++i)
 				for(int iElem=0; iElem<iElems; ++iElem)
-					vecRet.push_back(vert[iElem]);
+					vecRet.push_back(vert[iElem] / norm);
+		}
 
 		return vecRet;
 	};
@@ -109,7 +115,7 @@ GlPlotObj GlPlot_impl::CreateObject(const std::vector<t_vec3_gl>& verts,
 		obj.m_pvertexbuf->bind();
 		BOOST_SCOPE_EXIT(&obj) { obj.m_pvertexbuf->release(); } BOOST_SCOPE_EXIT_END
 
-		auto vecVerts = to_float_array(triagverts);
+		auto vecVerts = to_float_array(triagverts, 1,3, false);
 		obj.m_pvertexbuf->allocate(vecVerts.data(), vecVerts.size()*sizeof(typename decltype(vecVerts)::value_type));
 		pGl->glVertexAttribPointer(attrVertex, 3, GL_FLOAT, 0, 0, (void*)(0*sizeof(typename decltype(vecVerts)::value_type)));
 	}
@@ -121,7 +127,9 @@ GlPlotObj GlPlot_impl::CreateObject(const std::vector<t_vec3_gl>& verts,
 		obj.m_pnormalsbuf->bind();
 		BOOST_SCOPE_EXIT(&obj) { obj.m_pnormalsbuf->release(); } BOOST_SCOPE_EXIT_END
 
-		auto vecNorms = to_float_array(norms, 3);
+		auto vecNorms = bUseVertsAsNorm ?
+			to_float_array(triagverts, 1,3, true) :
+			to_float_array(norms, 3,3, false);
 		obj.m_pnormalsbuf->allocate(vecNorms.data(), vecNorms.size()*sizeof(typename decltype(vecNorms)::value_type));
 		pGl->glVertexAttribPointer(attrVertexNormal, 3, GL_FLOAT, 0, 0, (void*)(0*sizeof(typename decltype(vecNorms)::value_type)));
 	}
@@ -133,11 +141,11 @@ GlPlotObj GlPlot_impl::CreateObject(const std::vector<t_vec3_gl>& verts,
 		obj.m_pcolorbuf->bind();
 		BOOST_SCOPE_EXIT(&obj) { obj.m_pcolorbuf->release(); } BOOST_SCOPE_EXIT_END
 
-		std::vector<GLfloat> vecCols;
+		std::vector<t_real_gl> vecCols;
 		vecCols.reserve(4*triagverts.size());
 		for(std::size_t iVert=0; iVert<triagverts.size(); ++iVert)
 		{
-			for(int icol=0; icol<sizeof(obj.m_color)/sizeof(obj.m_color[0]); ++icol)
+			for(int icol=0; icol<obj.m_color.size(); ++icol)
 				vecCols.push_back(obj.m_color[icol]);
 		}
 
@@ -153,14 +161,15 @@ GlPlotObj GlPlot_impl::CreateObject(const std::vector<t_vec3_gl>& verts,
 }
 
 
-GlPlotObj GlPlot_impl::CreateSphere(t_real_gl rad, t_real_gl x, t_real_gl y, t_real_gl z)
+GlPlotObj GlPlot_impl::CreateSphere(t_real_gl rad, t_real_gl x, t_real_gl y, t_real_gl z,
+	t_real_gl r, t_real_gl g, t_real_gl b, t_real_gl a)
 {
 	auto solid = m::create_icosahedron<t_vec3_gl>(1);
 	auto [triagverts, norms, uvs] = m::spherify<t_vec3_gl>(
 		m::subdivide_triangles<t_vec3_gl>(
 			m::create_triangles<t_vec3_gl>(solid), 2), rad);
 
-	auto obj = CreateObject(std::get<0>(solid), triagverts, norms);
+	auto obj = CreateObject(std::get<0>(solid), triagverts, norms, m::create<t_vec_gl>({r,g,b,a}), true);
 
 	obj.m_mat(0,3) = x;
 	obj.m_mat(1,3) = y;
@@ -283,9 +292,9 @@ void GlPlot_impl::initialiseGL()
 
 	// geometries
 	{
-		GlPlotObj obj1 = CreateSphere(1., 0., 0., 0.);
-		GlPlotObj obj2 = CreateSphere(0.2, 0., 0., 2.);
-		GlPlotObj obj3 = CreateSphere(0.2, 0., 0., -2.);
+		GlPlotObj obj1 = CreateSphere(1., 0.,0.,0.,  0.,0.5,0.,1.);
+		GlPlotObj obj2 = CreateSphere(0.2, 0.,0.,2., 0.,0.,1.,1.);
+		GlPlotObj obj3 = CreateSphere(0.2, 0.,0.,-2., 0.,0.,1.,1.);
 		m_objs.emplace_back(std::move(obj1));
 		m_objs.emplace_back(std::move(obj2));
 		m_objs.emplace_back(std::move(obj3));
@@ -367,8 +376,8 @@ void GlPlot_impl::paintGL()
 		m_pPlot->context()->moveToThread(qGuiApp->thread());
 		m_pPlot->GetMutex()->unlock();
 
-		QMetaObject::invokeMethod(m_pPlot, static_cast<void (QOpenGLWidget::*)()>(&QOpenGLWidget::update),
-			Qt::ConnectionType::QueuedConnection);
+		//QMetaObject::invokeMethod(m_pPlot, static_cast<void (QOpenGLWidget::*)()>(&QOpenGLWidget::update),
+		//	Qt::ConnectionType::QueuedConnection);
 	}
 	BOOST_SCOPE_EXIT_END
 
@@ -382,7 +391,8 @@ void GlPlot_impl::paintGL()
 
 	if(m_bWantsResize)
 		resizeGL();
-
+	if(m_bPickerNeedsUpdate)
+		updatePicker();
 
 
 	auto *pGl = GetGlFunctions();
@@ -435,16 +445,22 @@ void GlPlot_impl::tick()
 
 void GlPlot_impl::tick(const std::chrono::milliseconds& ms)
 {
+	// zoom
+	t_mat_gl matZoom = m::unit<t_mat_gl>();
+	matZoom(0,0) = matZoom(1,1) = matZoom(2,2) = m_zoom;
+
+	// rotation
 	static t_real_gl fAngle = 0.f;
 	fAngle += 0.5f;
 
 	m_matCam = m::create<t_mat_gl>({1,0,0,0,  0,1,0,0,  0,0,1,-3,  0,0,0,1});
 	m_matCam *= m::rotation<t_mat_gl, t_vec_gl>(m::create<t_vec_gl>({1.,1.,0.,0.}), fAngle/180.*M_PI, 0);
+	m_matCam *= matZoom;
 	std::tie(m_matCam_inv, std::ignore) = m::inv<t_mat_gl>(m_matCam);
 
-	updatePicker();
-	//QMetaObject::invokeMethod(m_pPlot, static_cast<void (QOpenGLWidget::*)()>(&QOpenGLWidget::update),
-	//	Qt::ConnectionType::QueuedConnection);
+	m_bPickerNeedsUpdate = true;
+	QMetaObject::invokeMethod(m_pPlot, static_cast<void (QOpenGLWidget::*)()>(&QOpenGLWidget::update),
+		Qt::ConnectionType::QueuedConnection);
 }
 
 
@@ -467,9 +483,14 @@ QPointF GlPlot_impl::GlToScreenCoords(const t_vec_gl& vec4, bool *pVisible)
 
 void GlPlot_impl::mouseMoveEvent(const QPointF& pos)
 {
-	//std::cerr << "(" << pos.x() << ", " << pos.y() << ")" << std::endl;
 	m_posMouse = pos;
-	updatePicker();
+	m_bPickerNeedsUpdate = true;
+}
+
+
+void GlPlot_impl::zoom(t_real_gl val)
+{
+	m_zoom *= std::pow(2., val/64.);
 }
 
 
@@ -482,14 +503,15 @@ void GlPlot_impl::updatePicker()
 		m_matPerspective_inv, m_matViewport_inv, &m_matViewport, true);
 
 	// 3 vertices with rgba color
-	GLfloat red[] = {1.,0.,0.,1., 1.,0.,0.,1., 1.,0.,0.,1.};
+	t_real_gl red[] = {1.,0.,0.,1., 1.,0.,0.,1., 1.,0.,0.,1.};
 
 	for(auto& obj : m_objs)
 	{
-		GLfloat objcol[4*3];
-		std::copy(obj.m_color+0, obj.m_color+4, objcol+0*4);
-		std::copy(obj.m_color+0, obj.m_color+4, objcol+1*4);
-		std::copy(obj.m_color+0, obj.m_color+4, objcol+2*4);
+		t_real_gl objcol[4*3];
+		// TODO: only works if qvector4d stores its data linearly!
+		std::copy(&obj.m_color[0], &obj.m_color[0]+4, objcol+0*4);
+		std::copy(&obj.m_color[0], &obj.m_color[0]+4, objcol+1*4);
+		std::copy(&obj.m_color[0], &obj.m_color[0]+4, objcol+2*4);
 
 		obj.m_pcolorbuf->bind();
 		BOOST_SCOPE_EXIT(&obj) { obj.m_pcolorbuf->release(); } BOOST_SCOPE_EXIT_END
@@ -511,6 +533,8 @@ void GlPlot_impl::updatePicker()
 				obj.m_pcolorbuf->write(sizeof(objcol[0])*startidx*4, objcol, sizeof(objcol));
 		}
 	}
+
+	m_bPickerNeedsUpdate = false;
 }
 
 
@@ -550,6 +574,39 @@ GlPlot::~GlPlot()
 void GlPlot::mouseMoveEvent(QMouseEvent *pEvt)
 {
 	m_impl->mouseMoveEvent(pEvt->localPos());
+	pEvt->accept();
+}
+
+void GlPlot::mousePressEvent(QMouseEvent *pEvt)
+{
+	bool bLeftDown = 0, bRightDown = 0, bMidDown = 0;
+
+	if(pEvt->buttons() & Qt::LeftButton) bLeftDown = 1;
+	if(pEvt->buttons() & Qt::RightButton) bRightDown = 1;
+	if(pEvt->buttons() & Qt::MiddleButton) bMidDown = 1;
+
+	if(bMidDown)
+		m_impl->ResetZoom();
+
+	pEvt->accept();
+}
+
+void GlPlot::mouseReleaseEvent(QMouseEvent *pEvt)
+{
+	bool bLeftUp = 0, bRightUp = 0, bMidUp = 0;
+
+	if((pEvt->buttons() & Qt::LeftButton) == 0) bLeftUp = 1;
+	if((pEvt->buttons() & Qt::RightButton) == 0) bRightUp = 1;
+	if((pEvt->buttons() & Qt::MiddleButton) == 0) bMidUp = 1;
+
+	pEvt->accept();
+}
+
+void GlPlot::wheelEvent(QWheelEvent *pEvt)
+{
+	const t_real_gl degrees = pEvt->angleDelta().y() / 8.;
+	m_impl->zoom(degrees);
+	pEvt->accept();
 }
 
 

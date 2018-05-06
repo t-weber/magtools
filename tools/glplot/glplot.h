@@ -55,8 +55,13 @@ using t_vec_gl = m::qvecN_adapter<int, 4, t_real_gl, QVector4D>;
 using t_mat_gl = m::qmatNN_adapter<int, 4, 4, t_real_gl, QMatrix4x4>;
 
 
+class GlPlot;
+class GlPlot_impl;
+
+
 struct GlPlotObj
-{
+{ friend class GlPlot_impl;
+private:
 	GLuint m_vertexarr = 0;
 
 	std::shared_ptr<QOpenGLBuffer> m_pvertexbuf;
@@ -64,13 +69,15 @@ struct GlPlotObj
 	std::shared_ptr<QOpenGLBuffer> m_pcolorbuf;
 
 	std::vector<t_vec3_gl> m_vertices, m_triangles;
-	t_real_gl m_color[4] = { 0., 0., 1., 1. };	// rgba
+	t_vec_gl m_color = m::create<t_vec_gl>({ 0., 0., 1., 1. });	// rgba
 
 	t_mat_gl m_mat = m::unit<t_mat_gl>();
+
+public:
+	GlPlotObj() = default;
+	~GlPlotObj() = default;
 };
 
-
-class GlPlot;
 
 class GlPlot_impl : public QObject
 {
@@ -90,6 +97,7 @@ protected:
 private:
 	std::atomic<bool> m_bInitialised = false;
 	std::atomic<bool> m_bWantsResize = false;
+	std::atomic<bool> m_bPickerNeedsUpdate = false;
 	GlPlot *m_pPlot = nullptr;
 
 	std::vector<GlPlotObj> m_objs;
@@ -99,6 +107,7 @@ private:
 	t_mat_gl m_matPerspective, m_matPerspective_inv;
 	t_mat_gl m_matViewport, m_matViewport_inv;
 	t_mat_gl m_matCam, m_matCam_inv;
+	t_real_gl m_zoom = 1.;
 
 	GLint m_attrVertex = -1;
 	GLint m_attrVertexNormal = -1;
@@ -116,8 +125,12 @@ public:
 	void SetScreenDims(int w, int h);
 
 public:
-	GlPlotObj CreateObject(const std::vector<t_vec3_gl>& verts, const std::vector<t_vec3_gl>& triag_verts, const std::vector<t_vec3_gl>& norms);
-	GlPlotObj CreateSphere(t_real_gl rad=1, t_real_gl x=0, t_real_gl y=0, t_real_gl z=0);
+	GlPlotObj CreateObject(const std::vector<t_vec3_gl>& verts,
+		const std::vector<t_vec3_gl>& triag_verts, const std::vector<t_vec3_gl>& norms,
+		const t_vec_gl& color, bool bUseVertsAsNorm=false);
+	GlPlotObj CreateSphere(t_real_gl rad=1,
+		t_real_gl x=0, t_real_gl y=0, t_real_gl z=0,
+		t_real_gl r=0, t_real_gl g=0, t_real_gl b=0, t_real_gl a=1);
 
 protected slots:
 	void tick();
@@ -131,6 +144,8 @@ public slots:
 	void stoppedThread();
 
 	void mouseMoveEvent(const QPointF& pos);
+	void zoom(t_real_gl val);
+	void ResetZoom() { m_zoom = 1; }
 };
 
 
@@ -145,6 +160,9 @@ public:
 protected:
 	virtual void paintEvent(QPaintEvent*) override {}; /* empty for threading */
 	virtual void mouseMoveEvent(QMouseEvent *pEvt) override;
+	virtual void mousePressEvent(QMouseEvent *Evt) override;
+	virtual void mouseReleaseEvent(QMouseEvent *Evt) override;
+	virtual void wheelEvent(QWheelEvent *pEvt) override;
 
 protected slots:
 	void beforeComposing();
