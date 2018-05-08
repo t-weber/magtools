@@ -142,6 +142,9 @@ public:
 	GlPlotObj CreateSphere(t_real_gl rad=1,
 		t_real_gl x=0, t_real_gl y=0, t_real_gl z=0,
 		t_real_gl r=0, t_real_gl g=0, t_real_gl b=0, t_real_gl a=1);
+	GlPlotObj CreateCylinder(t_real_gl rad=1, t_real_gl h=1,
+		t_real_gl x=0, t_real_gl y=0, t_real_gl z=0,
+		t_real_gl r=0, t_real_gl g=0, t_real_gl b=0, t_real_gl a=1);
 
 protected slots:
 	void tick();

@@ -1777,6 +1777,165 @@ requires is_vec<t_vec>
 
 
 /**
+ * create a disk
+ * returns [vertices, face vertex indices, face normals, face uvs]
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
+create_disk(typename t_vec::value_type r = 1, std::size_t num_points=32)
+requires is_vec<t_vec>
+{
+	using t_real = typename t_vec::value_type;
+
+	// vertices
+	t_cont<t_vec> vertices;
+
+	// inner vertex
+	//vertices.push_back(create<t_vec>({ 0, 0, 0 }));
+	for(std::size_t pt=0; pt<num_points; ++pt)
+	{
+		const t_real phi = t_real(pt)/t_real(num_points) * t_real(2)*pi<t_real>;
+		const t_real c = std::cos(phi);
+		const t_real s = std::sin(phi);
+
+		// outer vertices
+		t_vec vert = create<t_vec>({ r*c, r*s, 0 });
+		vertices.emplace_back(std::move(vert));
+	}
+
+	// faces, normals & uvs
+	t_cont<t_cont<std::size_t>> faces;
+	t_cont<t_vec> normals;
+	t_cont<t_cont<t_vec>> uvs;	// TODO
+
+	// directly generate triangles
+	/*for(std::size_t face=0; face<num_points; ++face)
+	{
+		std::size_t idx0 = face + 1;	// outer 1
+		std::size_t idx1 = (face == num_points-1 ? 1 : face + 2);	// outer 2
+		std::size_t idx2 = 0;	// inner
+
+		faces.push_back({ idx0, idx1, idx2 });
+	}*/
+
+	t_cont<std::size_t> face(num_points);
+	std::iota(face.begin(), face.end(), 0);
+	faces.push_back(face);
+	normals.push_back(create<t_vec>({0,0,1}));
+
+	return std::make_tuple(vertices, faces, normals, uvs);
+}
+
+
+/**
+ * create a cylinder
+ * returns [vertices, face vertex indices, face normals, face uvs]
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
+create_cylinder(typename t_vec::value_type r=1, typename t_vec::value_type h=1,
+	bool bWithLids=true, std::size_t num_points=32)
+requires is_vec<t_vec>
+{
+	using t_real = typename t_vec::value_type;
+
+	// vertices
+	t_cont<t_vec> vertices;
+	t_cont<t_real> vertices_u;
+
+	for(std::size_t pt=0; pt<num_points; ++pt)
+	{
+		const t_real u = t_real(pt)/t_real(num_points);
+		const t_real phi = u * t_real(2)*pi<t_real>;
+		const t_real c = std::cos(phi);
+		const t_real s = std::sin(phi);
+
+		t_vec top = create<t_vec>({ r*c, r*s, h*t_real(0.5) });
+		t_vec bottom = create<t_vec>({ r*c, r*s, -h*t_real(0.5) });
+
+		vertices.emplace_back(std::move(top));
+		vertices.emplace_back(std::move(bottom));
+
+		vertices_u.push_back(u);
+	}
+
+	// faces, normals & uvs
+	t_cont<t_cont<std::size_t>> faces;
+	t_cont<t_vec> normals;
+	t_cont<t_cont<t_vec>> uvs;
+
+	for(std::size_t face=0; face<num_points; ++face)
+	{
+		std::size_t idx0 = face*2 + 0;	// top 1
+		std::size_t idx1 = face*2 + 1;	// bottom 1
+		std::size_t idx2 = (face >= num_points-1 ? 1 : face*2 + 3);	// bottom 2
+		std::size_t idx3 = (face >= num_points-1 ? 0 : face*2 + 2);	// top 2
+
+		t_vec n = cross<t_vec>({vertices[idx3]-vertices[idx0], vertices[idx1]-vertices[idx0]});
+		n /= norm<t_vec>(n);
+
+		faces.push_back({ idx0, idx1, idx2, idx3 });
+		normals.emplace_back(std::move(n));
+
+
+		t_real u1 = vertices_u[idx0];
+		t_real u2 = (face >= num_points-1 ? 1 : vertices_u[idx3]);
+		uvs.push_back({ create<t_vec>({u1,1}), create<t_vec>({u1,0}),
+			create<t_vec>({u2,0}), create<t_vec>({u2,1}) });
+	}
+
+
+	if(bWithLids)
+	{
+		const auto [disk_vertices, disk_faces, disk_normals, disk_uvs] = create_disk<t_vec, t_cont>(r, num_points);
+
+
+		// top lid
+		// vertex indices have to be adapted for merging
+		std::size_t vert_start_idx = vertices.size();
+
+		const t_vec top = create<t_vec>({ 0, 0, h*t_real(0.5) });
+		for(const auto& disk_vert : disk_vertices)
+			vertices.push_back(disk_vert + top);
+
+		auto disk_faces_top = disk_faces;
+		for(auto& disk_face : disk_faces_top)
+			for(auto& disk_face_idx : disk_face)
+			disk_face_idx += vert_start_idx;
+		faces.insert(faces.end(), disk_faces_top.begin(), disk_faces_top.end());
+
+		for(const auto& normal : disk_normals)
+			normals.push_back(normal);
+
+		uvs.insert(uvs.end(), disk_uvs.begin(), disk_uvs.end());
+
+
+		// bottom lid
+		vert_start_idx = vertices.size();
+		for(const auto& disk_vert : disk_vertices)
+			vertices.push_back(disk_vert - top);
+
+		auto disk_faces_bottom = disk_faces;
+		for(auto& disk_face : disk_faces_bottom)
+		{
+			for(auto& disk_face_idx : disk_face)
+				disk_face_idx += vert_start_idx;
+			std::reverse(disk_face.begin(), disk_face.end());
+		}
+		faces.insert(faces.end(), disk_faces_bottom.begin(), disk_faces_bottom.end());
+
+		for(const auto& normal : disk_normals)
+			normals.push_back(-normal);
+
+		uvs.insert(uvs.end(), disk_uvs.begin(), disk_uvs.end());
+	}
+
+	return std::make_tuple(vertices, faces, normals, uvs);
+}
+
+
+
+/**
  * create the faces of a cube
  * returns [vertices, face vertex indices, face normals, face uvs]
  */
