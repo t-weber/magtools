@@ -201,6 +201,22 @@ GlPlotObj GlPlot_impl::CreateCylinder(t_real_gl rad, t_real_gl h, t_real_gl x, t
 }
 
 
+GlPlotObj GlPlot_impl::CreateCone(t_real_gl rad, t_real_gl h, t_real_gl x, t_real_gl y, t_real_gl z,
+	t_real_gl r, t_real_gl g, t_real_gl b, t_real_gl a)
+{
+	auto solid = m::create_cone<t_vec3_gl>(rad, h);
+	auto [triagverts, norms, uvs] = m::create_triangles<t_vec3_gl>(solid);
+
+	auto obj = CreateObject(std::get<0>(solid), triagverts, norms, m::create<t_vec_gl>({r,g,b,a}), false);
+
+	obj.m_mat(0,3) = x;
+	obj.m_mat(1,3) = y;
+	obj.m_mat(2,3) = z;
+
+	return obj;
+}
+
+
 
 void GlPlot_impl::initialiseGL()
 {
@@ -316,6 +332,7 @@ void GlPlot_impl::initialiseGL()
 	{
 		GlPlotObj obj1 = CreateSphere(1., 0.,0.,0.,  0.,0.5,0.,1.);
 		//GlPlotObj obj1 = CreateCylinder(1., 1., 0.,0.,0.,  0.,0.5,0.,1.);
+		//GlPlotObj obj1 = CreateCone(1., 1., 0.,0.,0.,  0.,0.5,0.,1.);
 		GlPlotObj obj2 = CreateSphere(0.2, 0.,0.,2., 0.,0.,1.,1.);
 		GlPlotObj obj3 = CreateCylinder(0.2, 0.5, 0.,0.,-2., 0.,0.,1.,1.);
 		m_objs.emplace_back(std::move(obj1));

@@ -1828,6 +1828,83 @@ requires is_vec<t_vec>
 
 
 /**
+ * create a cone
+ * returns [vertices, face vertex indices, face normals, face uvs]
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
+create_cone(typename t_vec::value_type r = 1, typename t_vec::value_type h = 1,
+	bool bWithCap = true, std::size_t num_points = 32)
+requires is_vec<t_vec>
+{
+	using t_real = typename t_vec::value_type;
+
+	// vertices
+	t_cont<t_vec> vertices;
+
+	// inner vertex
+	vertices.push_back(create<t_vec>({ 0, 0, h }));
+
+	for(std::size_t pt=0; pt<num_points; ++pt)
+	{
+		const t_real phi = t_real(pt)/t_real(num_points) * t_real(2)*pi<t_real>;
+		const t_real c = std::cos(phi);
+		const t_real s = std::sin(phi);
+
+		// outer vertices
+		t_vec vert = create<t_vec>({ r*c, r*s, 0 });
+		vertices.emplace_back(std::move(vert));
+	}
+
+	// faces, normals & uvs
+	t_cont<t_cont<std::size_t>> faces;
+	t_cont<t_vec> normals;
+	t_cont<t_cont<t_vec>> uvs;	// TODO
+
+	for(std::size_t face=0; face<num_points; ++face)
+	{
+			std::size_t idx0 = face + 1;	// outer 1
+			std::size_t idx1 = (face == num_points-1 ? 1 : face + 2);	// outer 2
+			std::size_t idx2 = 0;	// inner
+
+			faces.push_back({ idx0, idx1, idx2 });
+
+
+			t_vec n = cross<t_vec>({vertices[idx2]-vertices[idx0], vertices[idx1]-vertices[idx0]});
+			n /= norm<t_vec>(n);
+
+			normals.push_back(n);
+	}
+
+
+	if(bWithCap)
+	{
+		const auto [disk_vertices, disk_faces, disk_normals, disk_uvs] = create_disk<t_vec, t_cont>(r, num_points);
+
+		// vertex indices have to be adapted for merging
+		const std::size_t vert_start_idx = vertices.size();
+		vertices.insert(vertices.end(), disk_vertices.begin(), disk_vertices.end());
+
+		auto disk_faces_bottom = disk_faces;
+		for(auto& disk_face : disk_faces_bottom)
+		{
+			for(auto& disk_face_idx : disk_face)
+				disk_face_idx += vert_start_idx;
+			std::reverse(disk_face.begin(), disk_face.end());
+		}
+		faces.insert(faces.end(), disk_faces_bottom.begin(), disk_faces_bottom.end());
+
+		for(const auto& normal : disk_normals)
+			normals.push_back(-normal);
+
+		uvs.insert(uvs.end(), disk_uvs.begin(), disk_uvs.end());
+	}
+
+	return std::make_tuple(vertices, faces, normals, uvs);
+}
+
+
+/**
  * create a cylinder
  * returns [vertices, face vertex indices, face normals, face uvs]
  */
