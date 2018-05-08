@@ -34,17 +34,23 @@ namespace algo = boost::algorithm;
 GlPlot_impl::GlPlot_impl(GlPlot *pPlot) : m_pPlot{pPlot},
 	m_matPerspective{m::unit<t_mat_gl>()}, m_matPerspective_inv{m::unit<t_mat_gl>()},
 	m_matViewport{m::unit<t_mat_gl>()}, m_matViewport_inv{m::unit<t_mat_gl>()},
-	m_matCam{m::unit<t_mat_gl>()}, m_matCam_inv{m::unit<t_mat_gl>()}
+	m_matCam{m::unit<t_mat_gl>()}, m_matCam_inv{m::unit<t_mat_gl>()},
+	m_matCamRot{m::unit<t_mat_gl>()}
 {
+#if _GL_USE_TIMER != 0
 	connect(&m_timer, &QTimer::timeout, this, static_cast<void (GlPlot_impl::*)()>(&GlPlot_impl::tick));
 	m_timer.start(std::chrono::milliseconds(1000 / 60));
+#endif
+
+	updateCam();
 }
 
 
 GlPlot_impl::~GlPlot_impl()
 {
+#if _GL_USE_TIMER != 0
 	m_timer.stop();
-
+#endif
 }
 
 
@@ -117,7 +123,7 @@ GlPlotObj GlPlot_impl::CreateObject(const std::vector<t_vec3_gl>& verts,
 
 		auto vecVerts = to_float_array(triagverts, 1,3, false);
 		obj.m_pvertexbuf->allocate(vecVerts.data(), vecVerts.size()*sizeof(typename decltype(vecVerts)::value_type));
-		pGl->glVertexAttribPointer(attrVertex, 3, GL_FLOAT, 0, 0, (void*)(0*sizeof(typename decltype(vecVerts)::value_type)));
+		pGl->glVertexAttribPointer(attrVertex, 3, GL_FLOAT, 0, 0, nullptr);
 	}
 
 	{	// normals
@@ -131,7 +137,7 @@ GlPlotObj GlPlot_impl::CreateObject(const std::vector<t_vec3_gl>& verts,
 			to_float_array(triagverts, 1,3, true) :
 			to_float_array(norms, 3,3, false);
 		obj.m_pnormalsbuf->allocate(vecNorms.data(), vecNorms.size()*sizeof(typename decltype(vecNorms)::value_type));
-		pGl->glVertexAttribPointer(attrVertexNormal, 3, GL_FLOAT, 0, 0, (void*)(0*sizeof(typename decltype(vecNorms)::value_type)));
+		pGl->glVertexAttribPointer(attrVertexNormal, 3, GL_FLOAT, 0, 0, nullptr);
 	}
 
 	{	// colors
@@ -150,7 +156,7 @@ GlPlotObj GlPlot_impl::CreateObject(const std::vector<t_vec3_gl>& verts,
 		}
 
 		obj.m_pcolorbuf->allocate(vecCols.data(), vecCols.size()*sizeof(typename decltype(vecCols)::value_type));
-		pGl->glVertexAttribPointer(attrVertexColor, 4, GL_FLOAT, 0, 0, (void*)(0*sizeof(typename decltype(vecCols)::value_type)));
+		pGl->glVertexAttribPointer(attrVertexColor, 4, GL_FLOAT, 0, 0, nullptr);
 	}
 
 
@@ -376,8 +382,11 @@ void GlPlot_impl::paintGL()
 		m_pPlot->context()->moveToThread(qGuiApp->thread());
 		m_pPlot->GetMutex()->unlock();
 
-		//QMetaObject::invokeMethod(m_pPlot, static_cast<void (QOpenGLWidget::*)()>(&QOpenGLWidget::update),
-		//	Qt::ConnectionType::QueuedConnection);
+// if the frame is not already updated by the timer, directly update it
+#if _GL_USE_TIMER == 0
+		QMetaObject::invokeMethod(m_pPlot, static_cast<void (QOpenGLWidget::*)()>(&QOpenGLWidget::update),
+			Qt::ConnectionType::QueuedConnection);
+#endif
 	}
 	BOOST_SCOPE_EXIT_END
 
@@ -445,16 +454,19 @@ void GlPlot_impl::tick()
 
 void GlPlot_impl::tick(const std::chrono::milliseconds& ms)
 {
+	// TODO
+	updateCam();
+}
+
+
+void GlPlot_impl::updateCam()
+{
 	// zoom
 	t_mat_gl matZoom = m::unit<t_mat_gl>();
 	matZoom(0,0) = matZoom(1,1) = matZoom(2,2) = m_zoom;
 
-	// rotation
-	static t_real_gl fAngle = 0.f;
-	fAngle += 0.5f;
-
-	m_matCam = m::create<t_mat_gl>({1,0,0,0,  0,1,0,0,  0,0,1,-3,  0,0,0,1});
-	m_matCam *= m::rotation<t_mat_gl, t_vec_gl>(m::create<t_vec_gl>({1.,1.,0.,0.}), fAngle/180.*M_PI, 0);
+	m_matCam = m::create<t_mat_gl>({1,0,0,0,  0,1,0,0,  0,0,1,-5,  0,0,0,1});
+	m_matCam *= m_matCamRot;
 	m_matCam *= matZoom;
 	std::tie(m_matCam_inv, std::ignore) = m::inv<t_mat_gl>(m_matCam);
 
@@ -484,13 +496,53 @@ QPointF GlPlot_impl::GlToScreenCoords(const t_vec_gl& vec4, bool *pVisible)
 void GlPlot_impl::mouseMoveEvent(const QPointF& pos)
 {
 	m_posMouse = pos;
-	m_bPickerNeedsUpdate = true;
+
+	if(m_bInRotation)
+	{
+		auto diff = (m_posMouse - m_posMouseRotationStart);
+		t_real_gl phi = diff.x() + m_phi_saved;
+		t_real_gl theta = diff.y() + m_theta_saved;
+
+		m_matCamRot = m::rotation<t_mat_gl, t_vec_gl>(m::create<t_vec_gl>({0.,1.,0.,0.}), phi/180.*M_PI, 0);
+		m_matCamRot *= m::rotation<t_mat_gl, t_vec_gl>(m::create<t_vec_gl>({1.,0.,0.,0.}), theta/180.*M_PI, 0);
+	}
+
+	updateCam();
 }
 
 
 void GlPlot_impl::zoom(t_real_gl val)
 {
 	m_zoom *= std::pow(2., val/64.);
+	updateCam();
+}
+
+void GlPlot_impl::ResetZoom()
+{
+	m_zoom = 1;
+	updateCam();
+}
+
+
+void GlPlot_impl::BeginRotation()
+{
+	if(!m_bInRotation)
+	{
+		m_posMouseRotationStart = m_posMouse;
+		m_bInRotation = true;
+	}
+}
+
+void GlPlot_impl::EndRotation()
+{
+	if(m_bInRotation)
+	{
+		auto diff = (m_posMouse - m_posMouseRotationStart);
+		m_phi_saved += diff.x();
+		m_theta_saved += diff.y();
+
+		m_bInRotation = false;
+	}
 }
 
 
@@ -587,6 +639,8 @@ void GlPlot::mousePressEvent(QMouseEvent *pEvt)
 
 	if(bMidDown)
 		m_impl->ResetZoom();
+	if(bRightDown)
+		m_impl->BeginRotation();
 
 	pEvt->accept();
 }
@@ -599,6 +653,9 @@ void GlPlot::mouseReleaseEvent(QMouseEvent *pEvt)
 	if((pEvt->buttons() & Qt::RightButton) == 0) bRightUp = 1;
 	if((pEvt->buttons() & Qt::MiddleButton) == 0) bMidUp = 1;
 
+	if(bRightUp)
+		m_impl->EndRotation();
+
 	pEvt->accept();
 }
 
@@ -606,6 +663,7 @@ void GlPlot::wheelEvent(QWheelEvent *pEvt)
 {
 	const t_real_gl degrees = pEvt->angleDelta().y() / 8.;
 	m_impl->zoom(degrees);
+
 	pEvt->accept();
 }
 

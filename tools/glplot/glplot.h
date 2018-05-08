@@ -12,6 +12,7 @@
 #ifndef __MAG_GL_PLOT_H__
 #define __MAG_GL_PLOT_H__
 
+
 // ----------------------------------------------------------------------------
 // GL versions
 #if !defined(_GL_MAJ_VER) || !defined(_GL_MIN_VER)
@@ -29,6 +30,9 @@
 #define _GL_FUNC(MAJ, MIN) _GL_FUNC_IMPL(MAJ, MIN)
 using qgl_funcs = _GL_FUNC(_GL_MAJ_VER, _GL_MIN_VER);
 // ----------------------------------------------------------------------------
+
+#define _GL_USE_TIMER 0
+
 
 #include <QtCore/QTimer>
 #include <QtCore/QThread>
@@ -93,6 +97,7 @@ protected:
 
 	void tick(const std::chrono::milliseconds& ms);
 	void updatePicker();
+	void updateCam();
 
 private:
 	std::atomic<bool> m_bInitialised = false;
@@ -107,6 +112,8 @@ private:
 	t_mat_gl m_matPerspective, m_matPerspective_inv;
 	t_mat_gl m_matViewport, m_matViewport_inv;
 	t_mat_gl m_matCam, m_matCam_inv;
+	t_mat_gl m_matCamRot;
+	t_real_gl m_phi_saved = 0, m_theta_saved = 0;
 	t_real_gl m_zoom = 1.;
 
 	GLint m_attrVertex = -1;
@@ -118,8 +125,12 @@ private:
 
 	std::atomic<int> m_iScreenDims[2] = { 800, 600 };
 	QPointF m_posMouse;
+	QPointF m_posMouseRotationStart, m_posMouseRotationEnd;
+	bool m_bInRotation = false;
 
+#if _GL_USE_TIMER != 0
 	QTimer m_timer;
+#endif
 
 public:
 	void SetScreenDims(int w, int h);
@@ -145,7 +156,10 @@ public slots:
 
 	void mouseMoveEvent(const QPointF& pos);
 	void zoom(t_real_gl val);
-	void ResetZoom() { m_zoom = 1; }
+	void ResetZoom();
+
+	void BeginRotation();
+	void EndRotation();
 };
 
 
