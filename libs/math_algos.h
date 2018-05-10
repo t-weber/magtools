@@ -1906,12 +1906,14 @@ requires is_vec<t_vec>
 
 /**
  * create a cylinder
+ * cyltype: 0 (no caps), 1 (with caps), 2 (arrow)
  * returns [vertices, face vertex indices, face normals, face uvs]
  */
 template<class t_vec, template<class...> class t_cont = std::vector>
 std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
-create_cylinder(typename t_vec::value_type r=1, typename t_vec::value_type h=1,
-	bool bWithLids=true, std::size_t num_points=32)
+create_cylinder(typename t_vec::value_type r = 1, typename t_vec::value_type h = 1,
+	int cyltype = 0, std::size_t num_points = 32,
+	typename t_vec::value_type arrow_r = 1.5, typename t_vec::value_type arrow_h = 0.5)
 requires is_vec<t_vec>
 {
 	using t_real = typename t_vec::value_type;
@@ -1962,33 +1964,15 @@ requires is_vec<t_vec>
 	}
 
 
-	if(bWithLids)
+	if(cyltype > 0)
 	{
 		const auto [disk_vertices, disk_faces, disk_normals, disk_uvs] = create_disk<t_vec, t_cont>(r, num_points);
 
-
-		// top lid
+		// bottom lid
 		// vertex indices have to be adapted for merging
 		std::size_t vert_start_idx = vertices.size();
-
 		const t_vec top = create<t_vec>({ 0, 0, h*t_real(0.5) });
-		for(const auto& disk_vert : disk_vertices)
-			vertices.push_back(disk_vert + top);
 
-		auto disk_faces_top = disk_faces;
-		for(auto& disk_face : disk_faces_top)
-			for(auto& disk_face_idx : disk_face)
-			disk_face_idx += vert_start_idx;
-		faces.insert(faces.end(), disk_faces_top.begin(), disk_faces_top.end());
-
-		for(const auto& normal : disk_normals)
-			normals.push_back(normal);
-
-		uvs.insert(uvs.end(), disk_uvs.begin(), disk_uvs.end());
-
-
-		// bottom lid
-		vert_start_idx = vertices.size();
 		for(const auto& disk_vert : disk_vertices)
 			vertices.push_back(disk_vert - top);
 
@@ -2005,11 +1989,52 @@ requires is_vec<t_vec>
 			normals.push_back(-normal);
 
 		uvs.insert(uvs.end(), disk_uvs.begin(), disk_uvs.end());
+
+
+		vert_start_idx = vertices.size();
+
+		if(cyltype == 1)	// top lid
+		{
+			for(const auto& disk_vert : disk_vertices)
+				vertices.push_back(disk_vert + top);
+
+			auto disk_faces_top = disk_faces;
+			for(auto& disk_face : disk_faces_top)
+				for(auto& disk_face_idx : disk_face)
+					disk_face_idx += vert_start_idx;
+			faces.insert(faces.end(), disk_faces_top.begin(), disk_faces_top.end());
+
+			for(const auto& normal : disk_normals)
+				normals.push_back(normal);
+
+			uvs.insert(uvs.end(), disk_uvs.begin(), disk_uvs.end());
+		}
+		else if(cyltype == 2)	// arrow top
+		{
+			// no need to cap the arrow if the radii are equal
+			bool bConeCap = !equals<t_real>(r, arrow_r);
+
+			const auto [cone_vertices, cone_faces, cone_normals, cone_uvs] =
+				create_cone<t_vec, t_cont>(arrow_r, arrow_h, bConeCap, num_points);
+
+			for(const auto& cone_vert : cone_vertices)
+				vertices.push_back(cone_vert + top);
+
+			auto cone_faces_top = cone_faces;
+			for(auto& cone_face : cone_faces_top)
+				for(auto& cone_face_idx : cone_face)
+					cone_face_idx += vert_start_idx;
+			faces.insert(faces.end(), cone_faces_top.begin(), cone_faces_top.end());
+
+			for(const auto& normal : cone_normals)
+				normals.push_back(normal);
+
+			uvs.insert(uvs.end(), cone_uvs.begin(), cone_uvs.end());
+		}
 	}
 
 	return std::make_tuple(vertices, faces, normals, uvs);
 }
-
 
 
 /**
