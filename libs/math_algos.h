@@ -2,7 +2,7 @@
  * container-agnostic math algorithms
  * @author Tobias Weber
  * @date dec-17
- * @license: see 'LICENSE.EUPL' file
+ * @license see 'LICENSE.EUPL' file
  */
 
 #ifndef __MATH_ALGOS_H__
@@ -16,6 +16,9 @@
 #include <tuple>
 #include <vector>
 #include <limits>
+#include <algorithm>
+#include <numeric>
+
 
 namespace m {
 
@@ -35,6 +38,18 @@ bool equals(T t1, T t2, T eps = std::numeric_limits<T>::epsilon())
 requires is_scalar<T>
 {
 	return std::abs(t1 - t2) <= eps;
+}
+
+/**
+ * are two complex numbers equal within an epsilon range?
+ */
+template<class T>
+bool equals(T t1, T t2, 
+	typename T::value_type eps = std::numeric_limits<typename T::value_type>::epsilon())
+requires is_complex<T>
+{
+	return (std::abs(t1.real() - t2.real()) <= eps) &&
+		(std::abs(t1.imag() - t2.imag()) <= eps);
 }
 
 /**
@@ -2427,6 +2442,26 @@ requires is_mat<t_mat> /*&& is_complex<typename t_mat::value_type>*/
 
 
 /**
+ * project the vector of SU(2) matrices onto a vector
+ * proj = <sigma|vec>
+ */
+template<class t_vec, class t_mat>
+t_mat proj_su2(const t_vec& vec, bool bIsNormalised=1)
+requires is_vec<t_vec> && is_mat<t_mat>
+{
+	typename t_vec::value_type len = 1;
+	if(!bIsNormalised)
+		len = norm<t_vec>(vec);
+
+	t_mat proj = zero<t_mat>(2,2);
+	for(std::size_t i=0; i<std::min<std::size_t>(vec.size(), 3); ++i)
+		proj = proj + vec[i]/len * su2_matrix<t_mat>(i);
+
+	return proj;
+}
+
+
+/**
  * SU(2) ladders
  */
 template<class t_mat>
@@ -2521,5 +2556,93 @@ requires is_basic_vec<t_vec>
 // ----------------------------------------------------------------------------
 
 
+
+
+// ----------------------------------------------------------------------------
+// polarisation
+// ----------------------------------------------------------------------------
+
+
+/**
+ * conjugate complex vector
+ */
+template<class t_vec>
+t_vec conj(const t_vec& vec)
+requires is_basic_vec<t_vec>
+{
+	const std::size_t N = vec.size();
+	t_vec vecConj = zero<t_vec>(N);
+
+	for(std::size_t iComp=0; iComp<N; ++iComp)
+		vecConj[iComp] = std::conj(vec[iComp]);
+
+	return vecConj;
+}
+
+
+/**
+ * polarisation density matrix: 0.5 + 0.5*<P|sigma>
+ */
+template<class t_vec, class t_mat>
+t_mat pol_density_mat(const t_vec& P, typename t_vec::value_type c=0.5)
+requires is_vec<t_vec> && is_mat<t_mat>
+{
+	return (unit<t_mat>(2,2) + proj_su2<t_vec, t_mat>(P, true)) * c;
+}
+
+
+/**
+ * Blume-Maleev equation, see: https://doi.org/10.1016/B978-044451050-1/50006-9 - p. 225
+ * returns scattering intensity and final polarisation vector
+ */
+template<class t_vec, typename t_cplx = typename t_vec::value_type>
+std::tuple<t_cplx, t_vec> blume_maleev(const t_vec& P_i, const t_vec& Mperp, const t_cplx& N)
+requires is_vec<t_vec>
+{
+	const t_vec MperpConj = conj(Mperp);
+	const t_cplx NConj = std::conj(N);
+	const t_cplx imag(0, 1);
+
+	// ------------------------------------------------------------------------
+	// intensity
+	// nuclear
+	t_cplx I = N*NConj;
+
+	// nuclear-magnetic
+	I += NConj*inner<t_vec>(P_i, Mperp);
+	I += N*inner<t_vec>(P_i, MperpConj);
+
+	// magnetic, non-chiral
+	I += inner<t_vec>(Mperp, MperpConj);
+
+	// magnetic, chiral
+	I += -imag * inner<t_vec>(P_i, cross<t_vec>({ Mperp, MperpConj }));
+	// ------------------------------------------------------------------------
+
+	// ------------------------------------------------------------------------
+	// polarisation vector
+	// nuclear
+	t_vec P_f = P_i * N*NConj;
+
+	// nuclear-magnetic
+	P_f += NConj * Mperp;
+	P_f += N * MperpConj;
+	P_f += imag * N * cross<t_vec>({ P_i, MperpConj });
+	P_f += -imag * NConj * cross<t_vec>({ P_i, Mperp });
+
+	// magnetic, non-chiral
+	P_f += Mperp * inner<t_vec>(P_i, MperpConj);
+	P_f += MperpConj * inner<t_vec>(P_i, Mperp);
+	P_f += -P_i * inner<t_vec>(Mperp, MperpConj);
+
+	// magnetic, chiral
+	P_f += imag * cross<t_vec>({ Mperp, MperpConj });
+	// ------------------------------------------------------------------------
+
+	return std::make_tuple(I, P_f/I);
+}
+
+
+// ----------------------------------------------------------------------------
 }
 #endif

@@ -22,7 +22,7 @@ namespace m {
  */
 template<class T>
 concept bool is_scalar = 
-	std::is_floating_point_v<T> || std::is_integral_v<T>;
+	std::is_floating_point_v<T> || std::is_integral_v<T> /*|| std::is_arithmetic_v<T>*/;
 
 
 /**
@@ -94,6 +94,26 @@ concept bool is_mat = requires(const T& a)
 	a*a(0,0);
 	a/a(0,0);					// operator/
 } && is_basic_mat<T>;
+
+
+
+
+/**
+ * requirements for a complex number
+ */
+template<class T>
+concept bool is_complex = requires(const T& a)
+{
+	typename T::value_type;		// must have a value_type
+
+	a.real();					// must have a real() member function
+	a.imag();					// must have an imag() member function
+
+	a+a;
+	a-a;
+	a*a;
+	a/a;
+};
 // ----------------------------------------------------------------------------
 
 
