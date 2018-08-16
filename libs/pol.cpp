@@ -23,9 +23,9 @@ using t_matvec = std::vector<t_mat>;
 
 int main()
 {
-	t_vec Mperp = create<t_vec>({0, 0, t_cplx(0,1)});
-	t_vec P = create<t_vec>({0, 0, 1});
-	t_cplx N(0,1);
+	t_vec Mperp = create<t_vec>({0, 0, t_cplx(1,2)});
+	t_vec P = create<t_vec>({0, 1, 1});
+	t_cplx N(3,4);
 
 	auto [I, P_f] = blume_maleev<t_vec, t_cplx>(P, Mperp, N);
 	std::cout << "I = " << I << "\nP_f = " << P_f << std::endl;
