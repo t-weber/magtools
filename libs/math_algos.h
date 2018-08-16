@@ -845,6 +845,24 @@ requires is_mat<t_mat>
 
 
 /**
+ * trace
+ */
+template<class t_mat>
+typename t_mat::value_type trace(const t_mat& mat)
+requires is_mat<t_mat>
+{
+	using T = typename t_mat::value_type;
+	T _tr = T(0);
+
+	std::size_t N = std::min(mat.size1(), mat.size2());
+	for(std::size_t i=0; i<N; ++i)
+		_tr += mat(i,i);
+
+	return _tr;
+}
+
+
+/**
  * inverted matrix
  */
 template<class t_mat>
@@ -2581,6 +2599,25 @@ requires is_basic_vec<t_vec>
 
 
 /**
+ * hermitian conjugate complex matrix
+ */
+template<class t_mat>
+t_mat herm(const t_mat& M)
+requires is_basic_mat<t_mat>
+{
+	const std::size_t N1 = M.size1();
+	const std::size_t N2 = M.size2();
+	t_mat matConj = zero<t_mat>(N2, N1);
+
+	for(std::size_t i=0; i<N1; ++i)
+		for(std::size_t j=0; j<N2; ++j)
+			matConj(j,i) = std::conj(M(i,j));
+
+	return matConj;
+}
+
+
+/**
  * polarisation density matrix: 0.5 + 0.5*<P|sigma>
  */
 template<class t_vec, class t_mat>
@@ -2592,7 +2629,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 
 /**
- * Blume-Maleev equation, see: https://doi.org/10.1016/B978-044451050-1/50006-9 - p. 225
+ * Blume-Maleev equation (see: https://doi.org/10.1016/B978-044451050-1/50006-9 - p. 225)
  * returns scattering intensity and final polarisation vector
  */
 template<class t_vec, typename t_cplx = typename t_vec::value_type>
@@ -2637,6 +2674,39 @@ requires is_vec<t_vec>
 
 	// magnetic, chiral
 	P_f += imag * cross<t_vec>({ Mperp, MperpConj });
+	// ------------------------------------------------------------------------
+
+	return std::make_tuple(I, P_f/I);
+}
+
+
+/**
+ * Blume-Maleev equation (see: https://doi.org/10.1016/B978-044451050-1/50006-9 - p. 225)
+ * calculate indirectly with density matrix
+ * returns scattering intensity and final polarisation vector
+ */
+template<class t_mat, class t_vec, typename t_cplx = typename t_vec::value_type>
+std::tuple<t_cplx, t_vec> blume_maleev_indir(const t_vec& P_i, const t_vec& Mperp, const t_cplx& N)
+requires is_mat<t_mat> && is_vec<t_vec>
+{
+	const t_cplx c = 0.5;
+
+	// density matrix
+	const auto density = pol_density_mat<t_vec, t_mat>(P_i, c);
+
+	// potential
+	const auto V = proj_su2<t_vec, t_mat>(Mperp, true);
+	const auto VConj = herm(V);
+
+	// ------------------------------------------------------------------------
+	// scattering intensity
+	t_cplx I = c * trace(VConj*V * density/c);
+	// ------------------------------------------------------------------------
+
+	// TODO vector & nuclear scattering
+	// ------------------------------------------------------------------------
+	// scattered polarisation vector
+	t_vec P_f;
 	// ------------------------------------------------------------------------
 
 	return std::make_tuple(I, P_f/I);

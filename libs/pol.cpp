@@ -29,6 +29,8 @@ int main()
 	auto [I, P_f] = blume_maleev<t_vec, t_cplx>(P, Mperp, N);
 	std::cout << "I = " << I << "\nP_f = " << P_f << std::endl;
 
+	auto [I2, P_f2] = blume_maleev_indir<t_mat, t_vec, t_cplx>(P, Mperp, N);
+	std::cout << "I2 = " << I2 << "\nP_f2 = " << P_f2 << std::endl;
 	
 	std::cout << "density matrix = " << pol_density_mat<t_vec, t_mat>(P) << std::endl;
 	return 0;
