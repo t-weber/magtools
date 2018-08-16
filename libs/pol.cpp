@@ -3,7 +3,7 @@
  * @author Tobias Weber
  * @date aug-18
  * @license: see 'LICENSE.EUPL' file
- * 
+ *
  * g++ -std=c++2a -fconcepts -o pol pol.cpp
  */
 
@@ -18,6 +18,7 @@ using t_real = double;
 using t_cplx = std::complex<t_real>;
 using t_vec = std::vector<t_cplx>;
 using t_mat = mat<t_cplx, std::vector>;
+using t_matvec = std::vector<t_mat>;
 
 
 int main()
@@ -31,7 +32,7 @@ int main()
 
 	auto [I2, P_f2] = blume_maleev_indir<t_mat, t_vec, t_cplx>(P, Mperp, N);
 	std::cout << "I2 = " << I2 << "\nP_f2 = " << P_f2 << std::endl;
-	
+
 	std::cout << "density matrix = " << pol_density_mat<t_vec, t_mat>(P) << std::endl;
 	return 0;
 }

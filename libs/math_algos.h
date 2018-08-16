@@ -392,6 +392,30 @@ requires is_basic_vec<t_vec>
 
 
 /**
+ * inner product between two vectors of different type
+ */
+template<class t_vec1, class t_vec2>
+typename t_vec1::value_type inner(const t_vec1& vec1, const t_vec2& vec2)
+requires is_basic_vec<t_vec1> && is_basic_vec<t_vec2>
+{
+	if(vec1.size()==0 || vec2.size()==0)
+		return typename t_vec1::value_type{};
+
+	// first element
+	auto val = vec1[0]*vec2[0];
+
+	// remaining elements
+	for(std::size_t i=1; i<std::min(vec1.size(), vec2.size()); ++i)
+	{
+		auto prod = vec1[i]*vec2[i];
+		val = val + prod;
+	}
+
+	return val;
+}
+
+
+/**
  * 2-norm
  */
 template<class t_vec>
@@ -2460,6 +2484,25 @@ requires is_mat<t_mat> /*&& is_complex<typename t_mat::value_type>*/
 
 
 /**
+ * get a vector of pauli matrices
+ */
+template<class t_vec>
+t_vec su2_matrices(bool bIncludeUnit = false)
+requires is_basic_vec<t_vec> && is_mat<typename t_vec::value_type> /*&& is_complex<typename t_mat::value_type>*/
+{
+	using t_mat = typename t_vec::value_type;
+
+	t_vec vec;
+	if(bIncludeUnit)
+		vec.emplace_back(unit<t_mat>(2));
+	for(std::size_t i=0; i<3; ++i)
+		vec.emplace_back(su2_matrix<t_mat>(i));
+
+	return vec;
+}
+
+
+/**
  * project the vector of SU(2) matrices onto a vector
  * proj = <sigma|vec>
  */
@@ -2471,11 +2514,8 @@ requires is_vec<t_vec> && is_mat<t_mat>
 	if(!bIsNormalised)
 		len = norm<t_vec>(vec);
 
-	t_mat proj = zero<t_mat>(2,2);
-	for(std::size_t i=0; i<std::min<std::size_t>(vec.size(), 3); ++i)
-		proj = proj + vec[i]/len * su2_matrix<t_mat>(i);
-
-	return proj;
+	const auto sigma = su2_matrices<std::vector<t_mat>>(false);
+	return inner<std::vector<t_mat>, t_vec>(sigma, vec);
 }
 
 
@@ -2602,23 +2642,30 @@ requires is_basic_vec<t_vec>
  * hermitian conjugate complex matrix
  */
 template<class t_mat>
-t_mat herm(const t_mat& M)
+t_mat herm(const t_mat& mat)
 requires is_basic_mat<t_mat>
 {
-	const std::size_t N1 = M.size1();
-	const std::size_t N2 = M.size2();
-	t_mat matConj = zero<t_mat>(N2, N1);
+	t_mat mat2;
+	if constexpr(is_dyn_mat<t_mat>)
+		mat2 = t_mat(mat.size2(), mat.size1());
 
-	for(std::size_t i=0; i<N1; ++i)
-		for(std::size_t j=0; j<N2; ++j)
-			matConj(j,i) = std::conj(M(i,j));
+	for(std::size_t i=0; i<mat.size1(); ++i)
+		for(std::size_t j=0; j<mat.size2(); ++j)
+			mat2(j,i) = std::conj(mat(i,j));
 
-	return matConj;
+	return mat2;
 }
 
 
 /**
- * polarisation density matrix: 0.5 + 0.5*<P|sigma>
+ * polarisation density matrix
+ * 
+ * eigenvector expansion of a state: |psi> = a_i |xi_i>
+ * mean value of operator with mixed states:
+ * <A> = p_i * <a_i|A|a_i>
+ * <A> = tr( A * p_i * |a_i><a_i| )
+ * <A> = tr( A * rho )
+ * polarisation density matrix: rho = 0.5 * (1 + <P|sigma>)
  */
 template<class t_vec, class t_mat>
 t_mat pol_density_mat(const t_vec& P, typename t_vec::value_type c=0.5)
@@ -2683,6 +2730,10 @@ requires is_vec<t_vec>
 /**
  * Blume-Maleev equation (see: https://doi.org/10.1016/B978-044451050-1/50006-9 - p. 225)
  * calculate indirectly with density matrix
+ *
+ * I   = 0.5 * tr( V^H V rho )
+ * P_f = 0.5 * tr( V^H sigma V rho ) / I
+ * 
  * returns scattering intensity and final polarisation vector
  */
 template<class t_mat, class t_vec, typename t_cplx = typename t_vec::value_type>
@@ -2703,10 +2754,16 @@ requires is_mat<t_mat> && is_vec<t_vec>
 	t_cplx I = c * trace(VConj*V * density/c);
 	// ------------------------------------------------------------------------
 
-	// TODO vector & nuclear scattering
+	// TODO: nuclear scattering
 	// ------------------------------------------------------------------------
 	// scattered polarisation vector
-	t_vec P_f;
+	const auto sigma = su2_matrices<std::vector<t_mat>>(false);
+
+	const auto m0 = (VConj * sigma[0]) * V * density / c;
+	const auto m1 = (VConj * sigma[1]) * V * density / c;
+	const auto m2 = (VConj * sigma[2]) * V * density / c;
+
+	t_vec P_f = create<t_vec>({ c*trace(m0), c*trace(m1), c*trace(m2) });
 	// ------------------------------------------------------------------------
 
 	return std::make_tuple(I, P_f/I);
