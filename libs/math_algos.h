@@ -44,7 +44,7 @@ requires is_scalar<T>
  * are two complex numbers equal within an epsilon range?
  */
 template<class T>
-bool equals(T t1, T t2,
+bool equals(const T& t1, const T& t2,
 	typename T::value_type eps = std::numeric_limits<typename T::value_type>::epsilon())
 requires is_complex<T>
 {
@@ -62,13 +62,23 @@ requires is_basic_vec<t_vec>
 {
 	using T = typename t_vec::value_type;
 
+	// size has to be equal
 	if(vec1.size() != vec2.size())
 		return false;
 
+	// check each element
 	for(std::size_t i=0; i<vec1.size(); ++i)
 	{
-		if(!equals<T>(vec1[i], vec2[i], eps))
-			return false;
+		if constexpr(is_complex<decltype(eps)>)
+		{
+			if(!equals<T>(vec1[i], vec2[i], eps.real()))
+				return false;
+		}
+		else
+		{
+			if(!equals<T>(vec1[i], vec2[i], eps))
+				return false;
+		}
 	}
 
 	return true;

@@ -8,11 +8,17 @@
 #ifndef __MATH_CONTS_H__
 #define __MATH_CONTS_H__
 
-#include "math_concepts.h"
+#include <boost/algorithm/string.hpp>
 #include <cassert>
 #include <vector>
 #include <iostream>
 #include <iomanip>
+#include "math_concepts.h"
+
+
+// separator tokens
+#define COLSEP ';'
+#define ROWSEP '.'
 
 
 namespace m {
@@ -210,10 +216,39 @@ requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 	{
 		ostr << vec[i];
 		if(i < N-1)
-			ostr << ", ";
+			ostr << COLSEP << " ";
 	}
 
 	return ostr;
+}
+
+
+/**
+ * operator >>
+ */
+template<class t_vec>
+std::istream& operator>>(std::istream& istr, t_vec& vec)
+requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
+{
+	vec.clear();
+
+	std::string str;
+	std::getline(istr, str);
+
+	std::vector<std::string> vecstr;
+	boost::split(vecstr, str, [](auto c)->bool { return c==COLSEP; }, boost::token_compress_on);
+
+	for(auto& tok : vecstr)
+	{
+		boost::trim(tok);
+		std::istringstream istr(tok);
+
+		typename t_vec::value_type c{};
+		istr >> c;
+		vec.emplace_back(std::move(c));
+	}
+
+	return istr;
 }
 // ----------------------------------------------------------------------------
 
@@ -389,11 +424,11 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 		{
 			ostr << mat(row, col);
 			if(col < COLS-1)
-				ostr << ", ";
+				ostr << COLSEP << " ";
 		}
 
 		if(row < ROWS-1)
-			ostr << "; ";
+			ostr << ROWSEP << " ";
 	}
 
 	return ostr;
