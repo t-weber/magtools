@@ -386,7 +386,7 @@ requires is_mat<t_mat> && is_basic_vec<t_vec>
 
 
 /**
- * inner product
+ * inner product <vec1|vec2>
  */
 template<class t_vec>
 typename t_vec::value_type inner(const t_vec& vec1, const t_vec& vec2)
@@ -395,7 +395,12 @@ requires is_basic_vec<t_vec>
 	typename t_vec::value_type val(0);
 
 	for(std::size_t i=0; i<vec1.size(); ++i)
-		val += vec1[i]*vec2[i];
+	{
+		if constexpr(is_complex<typename t_vec::value_type>)
+			val += std::conj(vec1[i]) * vec2[i];
+		else
+			val += vec1[i] * vec2[i];
+	}
 
 	return val;
 }
@@ -417,8 +422,16 @@ requires is_basic_vec<t_vec1> && is_basic_vec<t_vec2>
 	// remaining elements
 	for(std::size_t i=1; i<std::min(vec1.size(), vec2.size()); ++i)
 	{
-		auto prod = vec1[i]*vec2[i];
-		val = val + prod;
+		if constexpr(is_complex<typename t_vec1::value_type>)
+		{
+			auto prod = std::conj(vec1[i]) * vec2[i];
+			val = val + prod;
+		}
+		else
+		{
+			auto prod = vec1[i]*vec2[i];
+			val = val + prod;
+		}
 	}
 
 	return val;
@@ -452,7 +465,12 @@ requires is_basic_vec<t_vec> && is_mat<t_mat>
 
 	for(std::size_t n1=0; n1<N1; ++n1)
 		for(std::size_t n2=0; n2<N2; ++n2)
-			mat(n1, n2) = vec1[n1]*vec2[n2];
+		{
+			if constexpr(is_complex<typename t_vec::value_type>)
+				mat(n1, n2) = std::conj(vec1[n1]) * vec2[n2];
+			else
+				mat(n1, n2) = vec1[n1]*vec2[n2];
+		}
 
 	return mat;
 }
@@ -2478,9 +2496,9 @@ const t_mat& su2_matrix(std::size_t which)
 requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 {
 	using t_cplx = typename t_mat::value_type;
-	const t_cplx c0(0,0);
-	const t_cplx c1(1,0);
-	const t_cplx cI(0,1);
+	constexpr t_cplx c0(0,0);
+	constexpr t_cplx c1(1,0);
+	constexpr t_cplx cI(0,1);
 
 	static const t_mat mat[] =
 	{
@@ -2538,8 +2556,8 @@ const t_mat& su2_ladder(std::size_t which)
 requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 {
 	using t_cplx = typename t_mat::value_type;
-	const t_cplx cI(0,1);
-	const t_cplx c05(0.5, 0);
+	constexpr t_cplx cI(0,1);
+	constexpr t_cplx c05(0.5, 0);
 
 	static const t_mat mat[] =
 	{
@@ -2561,11 +2579,11 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 {
 	using t_cplx = typename t_mat::value_type;
 	using t_real = typename t_cplx::value_type;
-	const t_cplx c0(0,0);
-	const t_cplx c1(1,0);
-	const t_cplx c2(2,0);
-	const t_cplx cI(0,1);
-	const t_real s3 = std::sqrt(3.);
+	constexpr t_cplx c0(0,0);
+	constexpr t_cplx c1(1,0);
+	constexpr t_cplx c2(2,0);
+	constexpr t_cplx cI(0,1);
+	constexpr t_real s3 = std::sqrt(3.);
 
 	static const t_mat mat[] =
 	{
@@ -2593,8 +2611,9 @@ T structure_factor(const t_cont<T>& Ms_or_bs, const t_cont<t_vec>& Rs, const t_v
 requires is_basic_vec<t_vec>
 {
 	using t_real = typename t_cplx::value_type;
-	const t_cplx cI(0,1);
-	const t_real twopi = pi<t_real> * t_real(2);
+	constexpr t_cplx cI(0,1);
+	constexpr t_real twopi = pi<t_real> * t_real(2);
+	constexpr t_real expsign = -1;
 
 	T F;
 	if constexpr(is_vec<T>)
@@ -2607,7 +2626,7 @@ requires is_basic_vec<t_vec>
 
 	while(iterM_or_b != Ms_or_bs.end() && iterR != Rs.end())
 	{
-		F += (*iterM_or_b) * std::exp(-cI * twopi * inner<t_vec>(Q, *iterR));
+		F += (*iterM_or_b) * std::exp(expsign * cI * twopi * inner<t_vec>(Q, *iterR));
 
 		// next M or b if available (otherwise keep current)
 		auto iterM_or_b_next = std::next(iterM_or_b, 1);
@@ -2643,7 +2662,12 @@ requires is_basic_vec<t_vec>
 	t_vec vecConj = zero<t_vec>(N);
 
 	for(std::size_t iComp=0; iComp<N; ++iComp)
-		vecConj[iComp] = std::conj(vec[iComp]);
+	{
+		if constexpr(is_complex<typename t_vec::value_type>)
+			vecConj[iComp] = std::conj(vec[iComp]);
+		else	// simply copy non-complex vector
+			vecConj[iComp] = vec[iComp];
+	}
 
 	return vecConj;
 }
@@ -2662,7 +2686,12 @@ requires is_basic_mat<t_mat>
 
 	for(std::size_t i=0; i<mat.size1(); ++i)
 		for(std::size_t j=0; j<mat.size2(); ++j)
-			mat2(j,i) = std::conj(mat(i,j));
+		{
+			if constexpr(is_complex<typename t_mat::value_type>)
+				mat2(j,i) = std::conj(mat(i,j));
+			else	// simply transpose non-complex matrix
+				mat2(j,i) = mat(i,j);
+		}
 
 	return mat2;
 }
@@ -2696,7 +2725,7 @@ requires is_vec<t_vec>
 {
 	const t_vec MperpConj = conj(Mperp);
 	const t_cplx NConj = std::conj(N);
-	const t_cplx imag(0, 1);
+	constexpr t_cplx imag(0, 1);
 
 	// ------------------------------------------------------------------------
 	// intensity
@@ -2705,10 +2734,10 @@ requires is_vec<t_vec>
 
 	// nuclear-magnetic
 	I += NConj*inner<t_vec>(P_i, Mperp);
-	I += N*inner<t_vec>(P_i, MperpConj);
+	I += N*inner<t_vec>(Mperp, P_i);
 
 	// magnetic, non-chiral
-	I += inner<t_vec>(Mperp, MperpConj);
+	I += inner<t_vec>(Mperp, Mperp);
 
 	// magnetic, chiral
 	I += -imag * inner<t_vec>(P_i, cross<t_vec>({ Mperp, MperpConj }));
@@ -2726,9 +2755,9 @@ requires is_vec<t_vec>
 	P_f += -imag * NConj * cross<t_vec>({ P_i, Mperp });
 
 	// magnetic, non-chiral
-	P_f += Mperp * inner<t_vec>(P_i, MperpConj);
+	P_f += Mperp * inner<t_vec>(Mperp, P_i);
 	P_f += MperpConj * inner<t_vec>(P_i, Mperp);
-	P_f += -P_i * inner<t_vec>(Mperp, MperpConj);
+	P_f += -P_i * inner<t_vec>(Mperp, Mperp);
 
 	// magnetic, chiral
 	P_f += imag * cross<t_vec>({ Mperp, MperpConj });
@@ -2753,7 +2782,7 @@ std::tuple<t_cplx, t_vec> blume_maleev_indir(const t_vec& P_i, const t_vec& Mper
 requires is_mat<t_mat> && is_vec<t_vec>
 {
 	// spin-1/2
-	const t_cplx c = 0.5;
+	constexpr t_cplx c = 0.5;
 
 	// vector of pauli matrices
 	const auto sigma = su2_matrices<std::vector<t_mat>>(false);

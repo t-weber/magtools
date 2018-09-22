@@ -10,6 +10,7 @@
 
 #include <cstddef>
 #include <iterator>
+#include <complex>
 
 
 namespace m {
@@ -106,8 +107,9 @@ concept bool is_complex = requires(const T& a)
 {
 	typename T::value_type;		// must have a value_type
 
-	a.real();					// must have a real() member function
-	a.imag();					// must have an imag() member function
+	std::conj(a);
+	a.real();			// must have a real() member function
+	a.imag();			// must have an imag() member function
 
 	a+a;
 	a-a;

@@ -38,7 +38,7 @@ int main()
 	t_vec P = create<t_vec>({0, 1, 1});
 
 
-	std::cout << "N = "; get_istr(std::cin) >> N; 
+	std::cout << "N = "; get_istr(std::cin) >> N;
 	std::cout << "Mperp = "; std::cin >> Mperp; Mperp.resize(3);
 	std::cout << "P = "; std::cin >> P; P.resize(3);
 
