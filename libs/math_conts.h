@@ -18,7 +18,7 @@
 
 // separator tokens
 #define COLSEP ';'
-#define ROWSEP '.'
+#define ROWSEP '|'
 
 
 namespace m {

@@ -270,7 +270,7 @@ requires is_basic_vec<t_vec>
 
 
 /**
- * create matrix from nested initializer_lists in columns[rows] order
+ * create matrix from nested initializer_lists in columns/rows order
  */
 template<class t_mat,
 	template<class...> class t_cont_outer = std::initializer_list,
@@ -2602,6 +2602,28 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 
 
 /**
+ * crystallographic B matrix, B = 2pi * A^(-T)
+ * after: https://en.wikipedia.org/wiki/Fractional_coordinates
+ */
+template<class t_mat, class t_real = typename t_mat::value_type>
+t_mat B_matrix(t_real a, t_real b, t_real c, t_real _aa, t_real _bb, t_real _cc)
+requires is_mat<t_mat>
+{
+	const t_real sc = std::sin(_cc);
+	const t_real ca = std::cos(_aa);
+	const t_real cb = std::cos(_bb);
+	const t_real cc = std::cos(_cc);
+	const t_real rr = std::sqrt(1. + 2.*ca*cb*cc - (ca*ca + cb*cb + cc*cc));
+
+	return t_real(2)*pi<t_real> * create<t_mat>({
+		1./a,				0.,				0.,
+		-1./a * cc/sc,		1./b * 1./sc,			0.,
+		(cc*ca - cb)/(a*sc*rr), 	(cb*cc-ca)/(b*sc*rr),		sc/(c*rr)
+	});
+}
+
+
+/**
  * general structure factor calculation
  * e.g. type T as vector (complex number) for magnetic (nuclear) structure factor
  * Ms_or_bs:
@@ -2610,10 +2632,11 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 	- magnetisation (* magnetic form factor) for magnetic neutron scattering
  * Rs: atomic positions
  * Q: scattering vector G for nuclear scattering or G+k for magnetic scattering with propagation vector k
+ * fs: optional magnetic form factors
  */
 template<class t_vec, class T = t_vec, template<class...> class t_cont = std::vector,
 	class t_cplx = std::complex<double>>
-T structure_factor(const t_cont<T>& Ms_or_bs, const t_cont<t_vec>& Rs, const t_vec& Q)
+T structure_factor(const t_cont<T>& Ms_or_bs, const t_cont<t_vec>& Rs, const t_vec& Q, const t_vec* fs=nullptr)
 requires is_basic_vec<t_vec>
 {
 	using t_real = typename t_cplx::value_type;
@@ -2629,15 +2652,29 @@ requires is_basic_vec<t_vec>
 
 	auto iterM_or_b = Ms_or_bs.begin();
 	auto iterR = Rs.begin();
+	typename t_vec::const_iterator iterf;
+	if(fs) iterf = fs->begin();
 
 	while(iterM_or_b != Ms_or_bs.end() && iterR != Rs.end())
 	{
-		F += (*iterM_or_b) * std::exp(expsign * cI * twopi * inner<t_vec>(Q, *iterR));
+		// if form factors are given, use them, otherwise set to 1
+		t_real f = (fs ? (*iterf) : 1.);
+
+		// structure factor
+		F += (*iterM_or_b) * f * std::exp(expsign * cI * twopi * inner<t_vec>(Q, *iterR));
 
 		// next M or b if available (otherwise keep current)
 		auto iterM_or_b_next = std::next(iterM_or_b, 1);
 		if(iterM_or_b_next != Ms_or_bs.end())
 			iterM_or_b = iterM_or_b_next;
+
+		if(fs)
+		{
+			// next form factor if available (otherwise keep current)
+			auto iterf_next = std::next(iterf, 1);
+			if(iterf_next != fs->end())
+				iterf = iterf_next;
+		}
 
 		// next atomic position
 		std::advance(iterR, 1);
