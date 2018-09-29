@@ -2604,6 +2604,12 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 /**
  * general structure factor calculation
  * e.g. type T as vector (complex number) for magnetic (nuclear) structure factor
+ * Ms_or_bs:
+	- nuclear scattering lengths for nuclear neutron scattering or
+	- atomic form factors for x-ray scattering
+	- magnetisation (* magnetic form factor) for magnetic neutron scattering
+ * Rs: atomic positions
+ * Q: scattering vector G for nuclear scattering or G+k for magnetic scattering with propagation vector k
  */
 template<class t_vec, class T = t_vec, template<class...> class t_cont = std::vector,
 	class t_cplx = std::complex<double>>
@@ -2633,7 +2639,7 @@ requires is_basic_vec<t_vec>
 		if(iterM_or_b_next != Ms_or_bs.end())
 			iterM_or_b = iterM_or_b_next;
 
-		// next atom position
+		// next atomic position
 		std::advance(iterR, 1);
 	}
 

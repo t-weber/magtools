@@ -8,6 +8,11 @@
  */
 
 #include <boost/algorithm/string.hpp>
+#include <boost/units/systems/si/codata/electron_constants.hpp>
+#include <boost/units/systems/si/codata/neutron_constants.hpp>
+#include <boost/units/systems/si/codata/electromagnetic_constants.hpp>
+namespace si = boost::units::si;
+namespace consts = si::constants;
 
 #include <iostream>
 #include <fstream>
@@ -51,6 +56,9 @@ void calc(std::istream& istr)
 	bool bNucl = 1;
 	std::size_t linenr = 0;
 
+	// magnetic propagation vector
+	auto prop = create<t_vec>({0,0,0});
+
 	while(istr)
 	{
 		std::string line;
@@ -64,27 +72,41 @@ void calc(std::istream& istr)
 		std::vector<std::string> vectoks;
 		boost::split(vectoks, line, boost::is_any_of(g_ws), boost::token_compress_on);
 
-		t_real Rx = from_str<t_real>(vectoks[0]);
-		t_real Ry = from_str<t_real>(vectoks[1]);
-		t_real Rz = from_str<t_real>(vectoks[2]);
-
-		Rs.emplace_back(create<t_vec>({Rx, Ry, Rz}));
-
 		if(vectoks.size() == 4)		// nuclear
 		{
+			// atomic position
+			t_real Rx = from_str<t_real>(vectoks[0]);
+			t_real Ry = from_str<t_real>(vectoks[1]);
+			t_real Rz = from_str<t_real>(vectoks[2]);
+
+			// scattering length
 			t_cplx b = from_str<t_cplx>(vectoks[3]);
 
+			Rs.emplace_back(create<t_vec>({Rx, Ry, Rz}));
 			bs.emplace_back(b);
 			bNucl = 1;
 		}
 		else if(vectoks.size() == 6)	// magnetic
 		{
+			// atomic position
+			t_real Rx = from_str<t_real>(vectoks[0]);
+			t_real Ry = from_str<t_real>(vectoks[1]);
+			t_real Rz = from_str<t_real>(vectoks[2]);
+
+			// magnetic moment
 			t_real Mx = from_str<t_real>(vectoks[3]);
 			t_real My = from_str<t_real>(vectoks[4]);
 			t_real Mz = from_str<t_real>(vectoks[5]);
 
+			Rs.emplace_back(create<t_vec>({Rx, Ry, Rz}));
 			Ms.emplace_back(create<t_vec_cplx>({Mx, My, Mz}));
 			bNucl = 0;
+		}
+		else if(vectoks.size() == 3)	// propagation vector k
+		{
+			prop[0] = from_str<t_real>(vectoks[0]);
+			prop[1] = from_str<t_real>(vectoks[1]);
+			prop[2] = from_str<t_real>(vectoks[2]);
 		}
 		else
 		{
@@ -94,34 +116,106 @@ void calc(std::istream& istr)
 	}
 
 
+	std::size_t prec = 6;
+	std::cout.precision(prec);
 	std::cout << Rs.size() << " atom(s) defined.\n";
+	std::cout << bs.size() << " scattering length(s) defined.\n";
+	std::cout << Ms.size() << " magnetic moment(s) defined.\n";
+	std::cout << "Magnetic propagation vector: k = " << prop << ".\n";
 
-	for(t_real h=0; h<2; ++h)
-		for(t_real k=0; k<2; ++k)
-			for(t_real l=0; l<2; ++l)
+
+	const t_real maxBZ = 5.;
+	const t_real p = -t_real(consts::codata::mu_n/consts::codata::mu_N*consts::codata::r_e/si::meters)*0.5e15;
+	//std::cout << "p = " << p << "\n";
+
+	if(bNucl)
+	{
+		std::cout << "Nuclear structure factors:" << "\n";
+		std::cout
+			<< std::setw(prec*1.5) << std::right << "h (rlu)" << " "
+			<< std::setw(prec*1.5) << std::right << "k (rlu)" << " "
+			<< std::setw(prec*1.5) << std::right << "l (rlu)" << " "
+			<< std::setw(prec*2) << std::right << "|Fn|^2" << " "
+			<< std::setw(prec*5) << std::right << "Fn (fm)" << "\n";
+	}
+	else
+	{
+		std::cout << "Magnetic structure factors:" << "\n";
+		std::cout
+			<< std::setw(prec*2) << std::right << "h (rlu)" << " "
+			<< std::setw(prec*2) << std::right << "k (rlu)" << " "
+			<< std::setw(prec*2) << std::right << "l (rlu)" << " "
+			<< std::setw(prec*2) << std::right << "|Fm|^2" << " "
+			<< std::setw(prec*2) << std::right << "|Fm_perp|^2" << " "
+			<< std::setw(prec*5) << std::right << "Fm_x (fm)" << " "
+			<< std::setw(prec*5) << std::right << "Fm_y (fm)" << " "
+			<< std::setw(prec*5) << std::right << "Fm_z (fm)" << " "
+			<< std::setw(prec*5) << std::right << "Fm_perp_x (fm)" << " "
+			<< std::setw(prec*5) << std::right << "Fm_perp_y (fm)" << " "
+			<< std::setw(prec*5) << std::right << "Fm_perp_z (fm)" << "\n";
+	}
+
+	for(t_real h=-maxBZ; h<=maxBZ; ++h)
+		for(t_real k=-maxBZ; k<=maxBZ; ++k)
+			for(t_real l=-maxBZ; l<=maxBZ; ++l)
 			{
-				auto Q = create<t_vec>({h,k,l});
+				auto Q = create<t_vec>({h,k,l}) + prop;
 
 				if(bNucl)
 				{
 					auto Fn = structure_factor<t_vec, t_cplx>(bs, Rs, Q);
-					if(equals<t_cplx>(Fn, t_cplx(0), g_eps))
-						Fn = 0.;
+					//if(equals<t_cplx>(Fn, t_cplx(0), g_eps)) Fn = 0.;
+					if(equals<t_real>(Fn.real(), 0, g_eps)) Fn.real(0.);
+					if(equals<t_real>(Fn.imag(), 0, g_eps)) Fn.imag(0.);
+					auto I = (std::conj(Fn)*Fn).real();
 
-					std::cout << "Fn(" << h << k << l << ") = "
+					/*std::cout << "Fn(" << h << k << l << ") = "
 						<< Fn << ", "
 						<< "In(" << h << k << l << ") = "
-						<< std::conj(Fn)*Fn << "\n";
+						<< std::conj(Fn)*Fn << "\n";*/
+					std::cout
+						<< std::setw(prec*1.5) << std::right << h << " "
+						<< std::setw(prec*1.5) << std::right << k << " "
+						<< std::setw(prec*1.5) << std::right << l << " "
+						<< std::setw(prec*2) << std::right << I << " "
+						<< std::setw(prec*5) << std::right << Fn << "\n";
 				}
 				else
 				{
-					auto Fm = structure_factor<t_vec, t_vec_cplx>(Ms, Rs, Q);
+					// TODO: include magnetic form factor f(Q)
+					auto Fm = p * structure_factor<t_vec, t_vec_cplx>(Ms, Rs, Q);
 					for(auto &comp : Fm)
-					if(equals<t_cplx>(comp, t_cplx(0), g_eps))
-						comp = 0.;
+						if(equals<t_cplx>(comp, t_cplx(0), g_eps))
+							comp = 0.;
 
-					std::cout << "Fm(" << h << k << l << ") = "
-						<< Fm[0] << ", " <<  Fm[1] << ", " << "Fm[2]" << ")\n";
+					// neutron scattering: orthogonal projection onto plane with normal Q.
+					auto Fm_perp = ortho_project<t_vec_cplx>(
+						Fm, create<t_vec_cplx>({Q[0], Q[1], Q[2]}), false);
+
+					//std::cout << "Fm(" << h << k << l << ") = "
+					//	<< Fm[0] << ", " <<  Fm[1] << ", " << ", " << Fm[2]" << ")\n";
+					//std::cout << "Fm_perp(" << h << k << l << ") = "
+					//	<< Fm_perp[0] << ", " <<  Fm_perp[1] << ", " << ", " << Fm_perp[2]" << ")\n";
+
+					t_real I = (std::conj(Fm[0])*Fm[0] +
+						std::conj(Fm[1])*Fm[1] +
+						std::conj(Fm[2])*Fm[2]).real();
+					t_real I_perp = (std::conj(Fm_perp[0])*Fm_perp[0] +
+						std::conj(Fm_perp[1])*Fm_perp[1] +
+						std::conj(Fm_perp[2])*Fm_perp[2]).real();
+
+					std::cout
+						<< std::setw(prec*2) << std::right << h+prop[0] << " "
+						<< std::setw(prec*2) << std::right << k+prop[1] << " "
+						<< std::setw(prec*2) << std::right << l+prop[2] << " "
+						<< std::setw(prec*2) << std::right << I << " "
+						<< std::setw(prec*2) << std::right << I_perp << " "
+						<< std::setw(prec*5) << std::right << Fm[0] << " "
+						<< std::setw(prec*5) << std::right << Fm[1] << " "
+						<< std::setw(prec*5) << std::right << Fm[2] << " "
+						<< std::setw(prec*5) << std::right << Fm_perp[0] << " "
+						<< std::setw(prec*5) << std::right << Fm_perp[1] << " "
+						<< std::setw(prec*5) << std::right << Fm_perp[2] << "\n";
 				}
 			}
 }
