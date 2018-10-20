@@ -46,6 +46,14 @@ T from_str(const std::string& str)
 }
 
 
+struct PowderLine
+{
+	t_real Q;
+	t_real I;
+	std::string peaks;
+};
+
+
 void calc(std::istream& istr)
 {
 	std::vector<t_vec_cplx> Ms;
@@ -56,6 +64,7 @@ void calc(std::istream& istr)
 	t_real angle[3] = {90., 90., 90.};
 
 	bool bNucl = 1;
+	bool bPowder = 0;
 	std::size_t linenr = 0;
 
 	// magnetic propagation vector
@@ -96,6 +105,7 @@ void calc(std::istream& istr)
 			t_real Rz = from_str<t_real>(vectoks[2]);
 
 			// magnetic moment
+			// TODO: length needed if vector is scaled to 1!
 			t_real Mx = from_str<t_real>(vectoks[3]);
 			t_real My = from_str<t_real>(vectoks[4]);
 			t_real Mz = from_str<t_real>(vectoks[5]);
@@ -104,7 +114,7 @@ void calc(std::istream& istr)
 			Ms.emplace_back(create<t_vec_cplx>({Mx, My, Mz}));
 			bNucl = 0;
 		}
-		else if(vectoks.size() == 7 && vectoks[0] == "x")	// unit cell definition
+		else if(vectoks.size() == 8 && vectoks[0] == "x")	// unit cell definition
 		{
 			latt[0] = from_str<t_real>(vectoks[1]);
 			latt[1] = from_str<t_real>(vectoks[2]);
@@ -112,6 +122,7 @@ void calc(std::istream& istr)
 			angle[0] = from_str<t_real>(vectoks[4]);
 			angle[1] = from_str<t_real>(vectoks[5]);
 			angle[2] = from_str<t_real>(vectoks[6]);
+			bPowder = (from_str<int>(vectoks[7]) != 0);
 		}
 		else if(vectoks.size() == 3 /*&& vectoks[0] == "k"*/)	// propagation vector k
 		{
@@ -146,33 +157,47 @@ void calc(std::istream& istr)
 	const t_real p = -t_real(consts::codata::mu_n/consts::codata::mu_N*consts::codata::r_e/si::meters)*0.5e15;
 	//std::cout << "p = " << p << "\n";
 
-	if(bNucl)
+	if(!bPowder)
 	{
-		std::cout << "Nuclear structure factors:" << "\n";
-		std::cout
-			<< std::setw(prec*1.5) << std::right << "h (rlu)" << " "
-			<< std::setw(prec*1.5) << std::right << "k (rlu)" << " "
-			<< std::setw(prec*1.5) << std::right << "l (rlu)" << " "
-			<< std::setw(prec*2) << std::right << "|Q| (1/A)" << " "
-			<< std::setw(prec*2) << std::right << "|Fn|^2" << " "
-			<< std::setw(prec*5) << std::right << "Fn (fm)" << "\n";
+		if(bNucl)
+		{
+			std::cout << "Nuclear single-crystal structure factors:" << "\n";
+			std::cout
+				<< std::setw(prec*1.5) << std::right << "h (rlu)" << " "
+				<< std::setw(prec*1.5) << std::right << "k (rlu)" << " "
+				<< std::setw(prec*1.5) << std::right << "l (rlu)" << " "
+				<< std::setw(prec*2) << std::right << "|Q| (1/A)" << " "
+				<< std::setw(prec*2) << std::right << "|Fn|^2" << " "
+				<< std::setw(prec*5) << std::right << "Fn (fm)" << "\n";
+		}
+		else
+		{
+			std::cout << "Magnetic single-crystal structure factors:" << "\n";
+			std::cout
+				<< std::setw(prec*2) << std::right << "h (rlu)" << " "
+				<< std::setw(prec*2) << std::right << "k (rlu)" << " "
+				<< std::setw(prec*2) << std::right << "l (rlu)" << " "
+				<< std::setw(prec*2) << std::right << "|Q| (1/A)" << " "
+				<< std::setw(prec*2) << std::right << "|Fm|^2" << " "
+				<< std::setw(prec*2) << std::right << "|Fm_perp|^2" << " "
+				<< std::setw(prec*5) << std::right << "Fm_x (fm)" << " "
+				<< std::setw(prec*5) << std::right << "Fm_y (fm)" << " "
+				<< std::setw(prec*5) << std::right << "Fm_z (fm)" << " "
+				<< std::setw(prec*5) << std::right << "Fm_perp_x (fm)" << " "
+				<< std::setw(prec*5) << std::right << "Fm_perp_y (fm)" << " "
+				<< std::setw(prec*5) << std::right << "Fm_perp_z (fm)" << "\n";
+		}
 	}
 	else
 	{
-		std::cout << "Magnetic structure factors:" << "\n";
+		if(bNucl)
+			std::cout << "Nuclear powder lines:" << "\n";
+		else
+			std::cout << "Magnetic powder lines:" << "\n";
+
 		std::cout
-			<< std::setw(prec*2) << std::right << "h (rlu)" << " "
-			<< std::setw(prec*2) << std::right << "k (rlu)" << " "
-			<< std::setw(prec*2) << std::right << "l (rlu)" << " "
 			<< std::setw(prec*2) << std::right << "|Q| (1/A)" << " "
-			<< std::setw(prec*2) << std::right << "|Fm|^2" << " "
-			<< std::setw(prec*2) << std::right << "|Fm_perp|^2" << " "
-			<< std::setw(prec*5) << std::right << "Fm_x (fm)" << " "
-			<< std::setw(prec*5) << std::right << "Fm_y (fm)" << " "
-			<< std::setw(prec*5) << std::right << "Fm_z (fm)" << " "
-			<< std::setw(prec*5) << std::right << "Fm_perp_x (fm)" << " "
-			<< std::setw(prec*5) << std::right << "Fm_perp_y (fm)" << " "
-			<< std::setw(prec*5) << std::right << "Fm_perp_z (fm)" << "\n";
+			<< std::setw(prec*2) << std::right << "|F|^2" << "\n";
 	}
 
 
@@ -180,6 +205,38 @@ void calc(std::istream& istr)
 	auto calc_magformfact = [](std::size_t atomidx, const auto& Qvec_invA) -> t_real
 	{
 		return 1.;
+	};
+
+
+	std::vector<PowderLine> powderlines;
+	auto add_powderline = [&powderlines](t_real Q, t_real I,
+		t_real h, t_real k, t_real l)
+	{
+		std::ostringstream ostrPeak;
+		ostrPeak << "(" << h << "," << k << "," << l << ");";
+
+		// is this Q value already in the vector?
+		bool foundQ = false;
+		for(auto& line : powderlines)
+		{
+			if(equals<t_real>(line.Q, Q, g_eps))
+			{
+				line.I += I;
+				line.peaks +=  ostrPeak.str();
+				foundQ = true;
+				break;
+			}
+		}
+
+		// start a new line
+		if(!foundQ)
+		{
+			PowderLine line;
+			line.Q = Q;
+			line.I = I;
+			line.peaks = ostrPeak.str();
+			powderlines.emplace_back(std::move(line));
+		}
 	};
 
 
@@ -200,17 +257,24 @@ void calc(std::istream& istr)
 					if(equals<t_real>(Fn.imag(), 0, g_eps)) Fn.imag(0.);
 					auto I = (std::conj(Fn)*Fn).real();
 
-					/*std::cout << "Fn(" << h << k << l << ") = "
-						<< Fn << ", "
-						<< "In(" << h << k << l << ") = "
-						<< std::conj(Fn)*Fn << "\n";*/
-					std::cout
-						<< std::setw(prec*1.5) << std::right << h << " "
-						<< std::setw(prec*1.5) << std::right << k << " "
-						<< std::setw(prec*1.5) << std::right << l << " "
-						<< std::setw(prec*2) << std::right << Qabs_invA << " "
-						<< std::setw(prec*2) << std::right << I << " "
-						<< std::setw(prec*5) << std::right << Fn << "\n";
+					if(!bPowder)
+					{
+						/*std::cout << "Fn(" << h << k << l << ") = "
+							<< Fn << ", "
+							<< "In(" << h << k << l << ") = "
+							<< std::conj(Fn)*Fn << "\n";*/
+						std::cout
+							<< std::setw(prec*1.5) << std::right << h << " "
+							<< std::setw(prec*1.5) << std::right << k << " "
+							<< std::setw(prec*1.5) << std::right << l << " "
+							<< std::setw(prec*2) << std::right << Qabs_invA << " "
+							<< std::setw(prec*2) << std::right << I << " "
+							<< std::setw(prec*5) << std::right << Fn << "\n";
+					}
+					else
+					{
+						add_powderline(Qabs_invA, I, h,k,l);
+					}
 				}
 				else
 				{
@@ -241,21 +305,46 @@ void calc(std::istream& istr)
 						std::conj(Fm_perp[1])*Fm_perp[1] +
 						std::conj(Fm_perp[2])*Fm_perp[2]).real();
 
-					std::cout
-						<< std::setw(prec*2) << std::right << h+prop[0] << " "
-						<< std::setw(prec*2) << std::right << k+prop[1] << " "
-						<< std::setw(prec*2) << std::right << l+prop[2] << " "
-						<< std::setw(prec*2) << std::right << Qabs_invA << " "
-						<< std::setw(prec*2) << std::right << I << " "
-						<< std::setw(prec*2) << std::right << I_perp << " "
-						<< std::setw(prec*5) << std::right << Fm[0] << " "
-						<< std::setw(prec*5) << std::right << Fm[1] << " "
-						<< std::setw(prec*5) << std::right << Fm[2] << " "
-						<< std::setw(prec*5) << std::right << Fm_perp[0] << " "
-						<< std::setw(prec*5) << std::right << Fm_perp[1] << " "
-						<< std::setw(prec*5) << std::right << Fm_perp[2] << "\n";
+					if(!bPowder)
+					{
+						std::cout
+							<< std::setw(prec*2) << std::right << h+prop[0] << " "
+							<< std::setw(prec*2) << std::right << k+prop[1] << " "
+							<< std::setw(prec*2) << std::right << l+prop[2] << " "
+							<< std::setw(prec*2) << std::right << Qabs_invA << " "
+							<< std::setw(prec*2) << std::right << I << " "
+							<< std::setw(prec*2) << std::right << I_perp << " "
+							<< std::setw(prec*5) << std::right << Fm[0] << " "
+							<< std::setw(prec*5) << std::right << Fm[1] << " "
+							<< std::setw(prec*5) << std::right << Fm[2] << " "
+							<< std::setw(prec*5) << std::right << Fm_perp[0] << " "
+							<< std::setw(prec*5) << std::right << Fm_perp[1] << " "
+							<< std::setw(prec*5) << std::right << Fm_perp[2] << "\n";
+					}
+					else
+					{
+						add_powderline(Qabs_invA, I_perp, h+prop[0],k+prop[1],l+prop[2]);
+					}
 				}
 			}
+
+
+	if(bPowder)
+	{
+		std::stable_sort(powderlines.begin(), powderlines.end(),
+			[](const PowderLine& line1, const PowderLine& line2) -> bool
+			{
+				return line1.Q < line2.Q;
+			});
+
+		for(const auto& line : powderlines)
+		{
+			std::cout
+				<< std::setw(prec*2) << std::right << line.Q << " "
+				<< std::setw(prec*2) << std::right << line.I << " "
+				<< line.peaks << "\n";
+		}
+	}
 }
 
 
