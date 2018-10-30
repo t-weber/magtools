@@ -4,7 +4,7 @@
  * @date aug-18
  * @license: see 'LICENSE.EUPL' file
  *
- * g++ -std=c++2a -fconcepts -I../.. -o pol pol.cpp
+ * g++ -std=c++2a -fconcepts -I../.. -o pol_cli pol_cli.cpp
  */
 
 

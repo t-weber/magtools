@@ -2658,7 +2658,15 @@ requires is_basic_vec<t_vec>
 	while(iterM_or_b != Ms_or_bs.end() && iterR != Rs.end())
 	{
 		// if form factors are given, use them, otherwise set to 1
-		t_real f = (fs ? (*iterf) : 1.);
+		t_real f = t_real(1);
+		if(fs)
+		{
+			auto fval = *iterf;
+			if constexpr(is_complex<decltype(fval)>)
+				f = fval.real();
+			else
+				f = fval;
+		}
 
 		// structure factor
 		F += (*iterM_or_b) * f * std::exp(expsign * cI * twopi * inner<t_vec>(Q, *iterR));
