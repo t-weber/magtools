@@ -70,7 +70,7 @@ qgl_funcs* GlPlot_impl::GetGlFunctions()
 }
 
 
-GlPlotObj GlPlot_impl::CreateObject(const std::vector<t_vec3_gl>& verts,
+GlPlotObj GlPlot_impl::CreateTriangleObject(const std::vector<t_vec3_gl>& verts,
 	const std::vector<t_vec3_gl>& triagverts, const std::vector<t_vec3_gl>& norms,
 	const t_vec_gl& color, bool bUseVertsAsNorm)
 {
@@ -80,6 +80,7 @@ GlPlotObj GlPlot_impl::CreateObject(const std::vector<t_vec3_gl>& verts,
 	GLint attrVertexColor = m_attrVertexColor;
 
 	GlPlotObj obj;
+	obj.m_type = GlPlotObjType::TRIANGLES;
 	obj.m_color = color;
 
 	// flatten vertex array into raw float array
@@ -158,6 +159,73 @@ GlPlotObj GlPlot_impl::CreateObject(const std::vector<t_vec3_gl>& verts,
 }
 
 
+GlPlotObj GlPlot_impl::CreateLineObject(const std::vector<t_vec3_gl>& verts, const t_vec_gl& color)
+{
+	qgl_funcs* pGl = GetGlFunctions();
+	GLint attrVertex = m_attrVertex;
+	GLint attrVertexColor = m_attrVertexColor;
+
+	GlPlotObj obj;
+	obj.m_type = GlPlotObjType::LINES;
+	obj.m_color = color;
+
+	// flatten vertex array into raw float array
+	auto to_float_array = [](const std::vector<t_vec3_gl>& verts, int iElems=3) -> std::vector<t_real_gl>
+	{
+		std::vector<t_real_gl> vecRet;
+		vecRet.reserve(verts.size()*iElems);
+
+		for(const t_vec3_gl& vert : verts)
+		{
+			for(int iElem=0; iElem<iElems; ++iElem)
+				vecRet.push_back(vert[iElem]);
+		}
+
+		return vecRet;
+	};
+
+	// main vertex array object
+	pGl->glGenVertexArrays(1, &obj.m_vertexarr);
+	pGl->glBindVertexArray(obj.m_vertexarr);
+
+	{	// vertices
+		obj.m_pvertexbuf = std::make_shared<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
+
+		obj.m_pvertexbuf->create();
+		obj.m_pvertexbuf->bind();
+		BOOST_SCOPE_EXIT(&obj) { obj.m_pvertexbuf->release(); } BOOST_SCOPE_EXIT_END
+
+		auto vecVerts = to_float_array(verts, 3);
+		obj.m_pvertexbuf->allocate(vecVerts.data(), vecVerts.size()*sizeof(typename decltype(vecVerts)::value_type));
+		pGl->glVertexAttribPointer(attrVertex, 3, GL_FLOAT, 0, 0, nullptr);
+	}
+
+	{	// colors
+		obj.m_pcolorbuf = std::make_shared<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
+
+		obj.m_pcolorbuf->create();
+		obj.m_pcolorbuf->bind();
+		BOOST_SCOPE_EXIT(&obj) { obj.m_pcolorbuf->release(); } BOOST_SCOPE_EXIT_END
+
+		std::vector<t_real_gl> vecCols;
+		vecCols.reserve(4*verts.size());
+		for(std::size_t iVert=0; iVert<verts.size(); ++iVert)
+		{
+			for(int icol=0; icol<obj.m_color.size(); ++icol)
+				vecCols.push_back(obj.m_color[icol]);
+		}
+
+		obj.m_pcolorbuf->allocate(vecCols.data(), vecCols.size()*sizeof(typename decltype(vecCols)::value_type));
+		pGl->glVertexAttribPointer(attrVertexColor, 4, GL_FLOAT, 0, 0, nullptr);
+	}
+
+
+	obj.m_vertices = std::move(verts);
+
+	return obj;
+}
+
+
 GlPlotObj GlPlot_impl::CreateSphere(t_real_gl rad, t_real_gl x, t_real_gl y, t_real_gl z,
 	t_real_gl r, t_real_gl g, t_real_gl b, t_real_gl a)
 {
@@ -166,7 +234,7 @@ GlPlotObj GlPlot_impl::CreateSphere(t_real_gl rad, t_real_gl x, t_real_gl y, t_r
 		m::subdivide_triangles<t_vec3_gl>(
 			m::create_triangles<t_vec3_gl>(solid), 2), rad);
 
-	auto obj = CreateObject(std::get<0>(solid), triagverts, norms, m::create<t_vec_gl>({r,g,b,a}), true);
+	auto obj = CreateTriangleObject(std::get<0>(solid), triagverts, norms, m::create<t_vec_gl>({r,g,b,a}), true);
 
 	obj.m_mat(0,3) = x;
 	obj.m_mat(1,3) = y;
@@ -182,7 +250,7 @@ GlPlotObj GlPlot_impl::CreateCylinder(t_real_gl rad, t_real_gl h, t_real_gl x, t
 	auto solid = m::create_cylinder<t_vec3_gl>(rad, h, true);
 	auto [triagverts, norms, uvs] = m::create_triangles<t_vec3_gl>(solid);
 
-	auto obj = CreateObject(std::get<0>(solid), triagverts, norms, m::create<t_vec_gl>({r,g,b,a}), false);
+	auto obj = CreateTriangleObject(std::get<0>(solid), triagverts, norms, m::create<t_vec_gl>({r,g,b,a}), false);
 
 	obj.m_mat(0,3) = x;
 	obj.m_mat(1,3) = y;
@@ -198,7 +266,7 @@ GlPlotObj GlPlot_impl::CreateCone(t_real_gl rad, t_real_gl h, t_real_gl x, t_rea
 	auto solid = m::create_cone<t_vec3_gl>(rad, h);
 	auto [triagverts, norms, uvs] = m::create_triangles<t_vec3_gl>(solid);
 
-	auto obj = CreateObject(std::get<0>(solid), triagverts, norms, m::create<t_vec_gl>({r,g,b,a}), false);
+	auto obj = CreateTriangleObject(std::get<0>(solid), triagverts, norms, m::create<t_vec_gl>({r,g,b,a}), false);
 
 	obj.m_mat(0,3) = x;
 	obj.m_mat(1,3) = y;
@@ -211,14 +279,30 @@ GlPlotObj GlPlot_impl::CreateCone(t_real_gl rad, t_real_gl h, t_real_gl x, t_rea
 GlPlotObj GlPlot_impl::CreateArrow(t_real_gl rad, t_real_gl h, t_real_gl x, t_real_gl y, t_real_gl z,
 	t_real_gl r, t_real_gl g, t_real_gl b, t_real_gl a)
 {
-	auto solid = m::create_cylinder<t_vec3_gl>(rad, h, 2, 32, rad, h);
+	auto solid = m::create_cylinder<t_vec3_gl>(rad, h, 2, 32, rad, rad*1.5);
 	auto [triagverts, norms, uvs] = m::create_triangles<t_vec3_gl>(solid);
 
-	auto obj = CreateObject(std::get<0>(solid), triagverts, norms, m::create<t_vec_gl>({r,g,b,a}), false);
+	auto obj = CreateTriangleObject(std::get<0>(solid), triagverts, norms, m::create<t_vec_gl>({r,g,b,a}), false);
 
 	obj.m_mat(0,3) = x;
 	obj.m_mat(1,3) = y;
 	obj.m_mat(2,3) = z;
+
+	return obj;
+}
+
+
+GlPlotObj GlPlot_impl::CreateCoordinateCross(t_real_gl min, t_real_gl max)
+{
+	auto col = m::create<t_vec_gl>({0,0,0,1});
+	auto verts = std::vector<t_vec3_gl>
+	{{
+		m::create<t_vec3_gl>({min,0,0}), m::create<t_vec3_gl>({max,0,0}),
+		m::create<t_vec3_gl>({0,min,0}), m::create<t_vec3_gl>({0,max,0}),
+		m::create<t_vec3_gl>({0,0,min}), m::create<t_vec3_gl>({0,0,max}),
+	}};
+
+	auto obj = CreateLineObject(verts, col);
 
 	return obj;
 }
@@ -337,14 +421,15 @@ void GlPlot_impl::initialiseGL()
 
 	// geometries
 	{
-		GlPlotObj obj1 = CreateSphere(1., 0.,0.,0.,  0.,0.5,0.,1.);
-		//GlPlotObj obj1 = CreateArrow(1., 1., 0.,0.,0.,  0.,0.5,0.,1.);
+		GlPlotObj coords = CreateCoordinateCross(-2.5, 2.5);
+		GlPlotObj obj1 = CreateArrow(0.1, 4., 0.,0.,0.,  0.,0.,0.75,1.);
 		//GlPlotObj obj1 = CreateCone(1., 1., 0.,0.,0.,  0.,0.5,0.,1.);
-		GlPlotObj obj2 = CreateSphere(0.2, 0.,0.,2., 0.,0.,1.,1.);
-		GlPlotObj obj3 = CreateCylinder(0.2, 0.5, 0.,0.,-2., 0.,0.,1.,1.);
+		//GlPlotObj obj2 = CreateSphere(0.2, 0.,0.,2., 0.,0.,1.,1.);
+		//GlPlotObj obj3 = CreateCylinder(0.2, 0.5, 0.,0.,-2., 0.,0.,1.,1.);
+		m_objs.emplace_back(std::move(coords));
 		m_objs.emplace_back(std::move(obj1));
-		m_objs.emplace_back(std::move(obj2));
-		m_objs.emplace_back(std::move(obj3));
+		//m_objs.emplace_back(std::move(obj2));
+		//m_objs.emplace_back(std::move(obj3));
 	}
 	LOGGLERR(pGl);
 
@@ -399,60 +484,102 @@ void GlPlot_impl::paintGL()
 {
 	auto *pContext = m_pPlot->context();
 	if(!pContext) return;
+	QPainter painter(m_pPlot);
 
-	BOOST_SCOPE_EXIT(m_pPlot)
+
+	// gl painting
 	{
+		BOOST_SCOPE_EXIT(m_pPlot, &painter)
+		{
 // if the frame is not already updated by the timer, directly update it
 #if _GL_USE_TIMER == 0
-		QMetaObject::invokeMethod(m_pPlot, static_cast<void (QOpenGLWidget::*)()>(&QOpenGLWidget::update),
-			Qt::ConnectionType::QueuedConnection);
+			QMetaObject::invokeMethod(m_pPlot, static_cast<void (QOpenGLWidget::*)()>(&QOpenGLWidget::update),
+				Qt::ConnectionType::QueuedConnection);
 #endif
-	}
-	BOOST_SCOPE_EXIT_END
-
-	if(m_bPickerNeedsUpdate)
-		updatePicker();
-
-
-	auto *pGl = GetGlFunctions();
-
-	// clear
-	pGl->glClearColor(1., 1., 1., 1.);
-	pGl->glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	pGl->glEnable(GL_DEPTH_TEST);
-
-
-	// bind shaders
-	m_pShaders->bind();
-	BOOST_SCOPE_EXIT(m_pShaders) { m_pShaders->release(); } BOOST_SCOPE_EXIT_END
-	LOGGLERR(pGl);
-
-
-	// set cam matrix
-	m_pShaders->setUniformValue(m_uniMatrixCam, m_matCam);
-
-	// triangle geometry
-	for(auto& obj : m_objs)
-	{
-		// main vertex array object
-		pGl->glBindVertexArray(obj.m_vertexarr);
-
-		m_pShaders->setUniformValue(m_uniMatrixObj, obj.m_mat);
-
-		pGl->glEnableVertexAttribArray(m_attrVertex);
-		pGl->glEnableVertexAttribArray(m_attrVertexNormal);
-		pGl->glEnableVertexAttribArray(m_attrVertexColor);
-		BOOST_SCOPE_EXIT(pGl, &m_attrVertex, &m_attrVertexNormal, &m_attrVertexColor)
-		{
-			pGl->glDisableVertexAttribArray(m_attrVertexColor);
-			pGl->glDisableVertexAttribArray(m_attrVertexNormal);
-			pGl->glDisableVertexAttribArray(m_attrVertex);
+			painter.endNativePainting();
 		}
 		BOOST_SCOPE_EXIT_END
+
+		if(m_bPickerNeedsUpdate)
+			updatePicker();
+
+
+		auto *pGl = GetGlFunctions();
+		painter.beginNativePainting();
+
+
+		// clear
+		pGl->glClearColor(1., 1., 1., 1.);
+		pGl->glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		pGl->glEnable(GL_DEPTH_TEST);
+
+
+		// bind shaders
+		m_pShaders->bind();
+		BOOST_SCOPE_EXIT(m_pShaders) { m_pShaders->release(); } BOOST_SCOPE_EXIT_END
 		LOGGLERR(pGl);
 
-		pGl->glDrawArrays(GL_TRIANGLES, 0, obj.m_triangles.size());
-		LOGGLERR(pGl);
+
+		// set cam matrix
+		m_pShaders->setUniformValue(m_uniMatrixCam, m_matCam);
+
+		// triangle geometry
+		for(auto& obj : m_objs)
+		{
+			// main vertex array object
+			pGl->glBindVertexArray(obj.m_vertexarr);
+
+			m_pShaders->setUniformValue(m_uniMatrixObj, obj.m_mat);
+
+			pGl->glEnableVertexAttribArray(m_attrVertex);
+			if(obj.m_type == GlPlotObjType::TRIANGLES)
+				pGl->glEnableVertexAttribArray(m_attrVertexNormal);
+			pGl->glEnableVertexAttribArray(m_attrVertexColor);
+			BOOST_SCOPE_EXIT(pGl, &m_attrVertex, &m_attrVertexNormal, &m_attrVertexColor)
+			{
+				pGl->glDisableVertexAttribArray(m_attrVertexColor);
+				pGl->glDisableVertexAttribArray(m_attrVertexNormal);
+				pGl->glDisableVertexAttribArray(m_attrVertex);
+			}
+			BOOST_SCOPE_EXIT_END
+			LOGGLERR(pGl);
+
+			if(obj.m_type == GlPlotObjType::TRIANGLES)
+				pGl->glDrawArrays(GL_TRIANGLES, 0, obj.m_triangles.size());
+			else if(obj.m_type == GlPlotObjType::LINES)
+				pGl->glDrawArrays(GL_LINES, 0, obj.m_vertices.size());
+			else
+				std::cerr << "Error: Unknown plot object." << std::endl;
+
+			LOGGLERR(pGl);
+		}
+
+		pGl->glDisable(GL_DEPTH_TEST);
+	}
+
+
+	// qt painting
+	{
+		//painter.drawLine(GlToScreenCoords(m::create<t_vec_gl>({-2.,0.,0.,1.})),
+		//	GlToScreenCoords(m::create<t_vec_gl>({2.,0.,0.,1.})));
+
+		// coordinate labels
+		painter.drawText(GlToScreenCoords(m::create<t_vec_gl>({0.,0.,0.,1.})), "0");
+		for(t_real_gl f=-2.; f<=2.; f+=0.5)
+		{
+			if(m::equals<t_real_gl>(f, 0))
+				continue;
+
+			std::ostringstream ostrF;
+			ostrF << f;
+			painter.drawText(GlToScreenCoords(m::create<t_vec_gl>({f,0.,0.,1.})), ostrF.str().c_str());
+			painter.drawText(GlToScreenCoords(m::create<t_vec_gl>({0.,f,0.,1.})), ostrF.str().c_str());
+			painter.drawText(GlToScreenCoords(m::create<t_vec_gl>({0.,0.,f,1.})), ostrF.str().c_str());
+		}
+
+		painter.drawText(GlToScreenCoords(m::create<t_vec_gl>({3.,0.,0.,1.})), "x");
+		painter.drawText(GlToScreenCoords(m::create<t_vec_gl>({0.,3.,0.,1.})), "y");
+		painter.drawText(GlToScreenCoords(m::create<t_vec_gl>({0.,0.,3.,1.})), "z");
 	}
 }
 
@@ -567,6 +694,9 @@ void GlPlot_impl::updatePicker()
 
 	for(auto& obj : m_objs)
 	{
+		if(obj.m_type != GlPlotObjType::TRIANGLES)
+			continue;
+
 		t_real_gl objcol[4*3];
 		// TODO: only works if qvector4d stores its data linearly!
 		std::copy(&obj.m_color[0], &obj.m_color[0]+4, objcol+0*4);

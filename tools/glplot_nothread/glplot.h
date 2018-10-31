@@ -61,9 +61,17 @@ class GlPlot;
 class GlPlot_impl;
 
 
+enum class GlPlotObjType
+{
+	TRIANGLES,
+	LINES
+};
+
+
 struct GlPlotObj
 { friend class GlPlot_impl;
 private:
+	GlPlotObjType m_type = GlPlotObjType::TRIANGLES;
 	GLuint m_vertexarr = 0;
 
 	std::shared_ptr<QOpenGLBuffer> m_pvertexbuf;
@@ -132,9 +140,11 @@ public:
 	void SetScreenDims(int w, int h);
 
 public:
-	GlPlotObj CreateObject(const std::vector<t_vec3_gl>& verts,
+	GlPlotObj CreateTriangleObject(const std::vector<t_vec3_gl>& verts,
 		const std::vector<t_vec3_gl>& triag_verts, const std::vector<t_vec3_gl>& norms,
 		const t_vec_gl& color, bool bUseVertsAsNorm=false);
+	GlPlotObj CreateLineObject(const std::vector<t_vec3_gl>& verts, const t_vec_gl& color);
+
 	GlPlotObj CreateSphere(t_real_gl rad=1,
 		t_real_gl x=0, t_real_gl y=0, t_real_gl z=0,
 		t_real_gl r=0, t_real_gl g=0, t_real_gl b=0, t_real_gl a=1);
@@ -147,6 +157,7 @@ public:
 	GlPlotObj CreateArrow(t_real_gl rad=1, t_real_gl h=1,
 		t_real_gl x=0, t_real_gl y=0, t_real_gl z=0,
 		t_real_gl r=0, t_real_gl g=0, t_real_gl b=0, t_real_gl a=1);
+	GlPlotObj CreateCoordinateCross(t_real_gl min, t_real_gl max);
 
 protected slots:
 	void tick();
