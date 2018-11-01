@@ -24,11 +24,30 @@ namespace algo = boost::algorithm;
 
 
 // ----------------------------------------------------------------------------
+void set_gl_format(bool bCore, int iMajorVer, int iMinorVer)
+{
+	QSurfaceFormat surf = QSurfaceFormat::defaultFormat();
+
+	surf.setRenderableType(QSurfaceFormat::OpenGL);
+	if(bCore)
+		surf.setProfile(QSurfaceFormat::CoreProfile);
+	else
+		surf.setProfile(QSurfaceFormat::CompatibilityProfile);
+	surf.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
+
+	if(iMajorVer > 0 && iMinorVer > 0)
+		surf.setVersion(iMajorVer, iMinorVer);
+
+	QSurfaceFormat::setDefaultFormat(surf);
+}
+
+
 // error codes: https://www.khronos.org/opengl/wiki/OpenGL_Error
 #define LOGGLERR(pGl) { if(auto err = pGl->glGetError(); err != GL_NO_ERROR) \
 	std::cerr << "gl error in " << __func__ \
 		<< " line " << std::dec <<  __LINE__  << ": " \
 		<< std::hex << err << std::endl; }
+// ----------------------------------------------------------------------------
 
 
 GlPlot_impl::GlPlot_impl(GlPlot *pPlot) : m_pPlot{pPlot},

@@ -54,25 +54,6 @@ static inline void set_locales()
 }
 
 
-static inline void set_gl_format(bool bCore=1, int iMajorVer=3, int iMinorVer=3)
-{
-	QSurfaceFormat surf = QSurfaceFormat::defaultFormat();
-
-	//surf.setOptions(QSurfaceFormat::DebugContext);
-	surf.setRenderableType(QSurfaceFormat::OpenGL);
-	if(bCore)
-		surf.setProfile(QSurfaceFormat::CoreProfile);
-	else
-		surf.setProfile(QSurfaceFormat::CompatibilityProfile);
-	surf.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
-
-	if(iMajorVer > 0 && iMinorVer > 0)
-		surf.setVersion(iMajorVer, iMinorVer);
-
-	QSurfaceFormat::setDefaultFormat(surf);
-}
-
-
 int main(int argc, char** argv)
 {
 	set_gl_format(1, _GL_MAJ_VER, _GL_MIN_VER);

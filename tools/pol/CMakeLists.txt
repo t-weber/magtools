@@ -18,6 +18,6 @@ add_definitions(-std=c++17 -fconcepts)
 add_definitions(${Boost_CXX_FLAGS})
 include_directories("${PROJECT_SOURCE_DIR}" "${Boost_INCLUDE_DIRS}/.." "../..")
 
-add_executable(pol pol.cpp ../glplot_nothread/glplot.cpp ../glplot_nothread/glplot.h)
+add_executable(pol pol.cpp ../glplot/glplot_nothread.cpp ../glplot/glplot_nothread.h)
 target_link_libraries(pol ${Boost_LIBRARIES})
 qt5_use_modules(pol Core Gui Widgets OpenGL)

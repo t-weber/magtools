@@ -9,7 +9,7 @@
  *  * http://code.qt.io/cgit/qt/qtbase.git/tree/examples/opengl/threadedqopenglwidget
  */
 
-#include "glplot.h"
+#include "glplot_nothread.h"
 
 #include <QtGui/QOpenGLContext>
 #include <QtGui/QOpenGLFunctions>
@@ -23,12 +23,32 @@
 namespace algo = boost::algorithm;
 
 
+
 // ----------------------------------------------------------------------------
+void set_gl_format(bool bCore, int iMajorVer, int iMinorVer)
+{
+	QSurfaceFormat surf = QSurfaceFormat::defaultFormat();
+
+	surf.setRenderableType(QSurfaceFormat::OpenGL);
+	if(bCore)
+		surf.setProfile(QSurfaceFormat::CoreProfile);
+	else
+		surf.setProfile(QSurfaceFormat::CompatibilityProfile);
+	surf.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
+
+	if(iMajorVer > 0 && iMinorVer > 0)
+		surf.setVersion(iMajorVer, iMinorVer);
+
+	QSurfaceFormat::setDefaultFormat(surf);
+}
+
+
 // error codes: https://www.khronos.org/opengl/wiki/OpenGL_Error
 #define LOGGLERR(pGl) { if(auto err = pGl->glGetError(); err != GL_NO_ERROR) \
 	std::cerr << "gl error in " << __func__ \
 		<< " line " << std::dec <<  __LINE__  << ": " \
 		<< std::hex << err << std::endl; }
+// ----------------------------------------------------------------------------
 
 
 GlPlot_impl::GlPlot_impl(GlPlot *pPlot) : m_pPlot{pPlot},
@@ -284,9 +304,8 @@ GlPlotObj GlPlot_impl::CreateArrow(t_real_gl rad, t_real_gl h, t_real_gl x, t_re
 
 	auto obj = CreateTriangleObject(std::get<0>(solid), triagverts, norms, m::create<t_vec_gl>({r,g,b,a}), false);
 
-	obj.m_mat(0,3) = x;
-	obj.m_mat(1,3) = y;
-	obj.m_mat(2,3) = z;
+	obj.m_mat = m::rotation<t_mat_gl, t_vec_gl>(m::create<t_vec_gl>({0,0,1}), m::create<t_vec_gl>({1,1,0}));
+	obj.m_mat *= m::hom_translation<t_mat_gl>(x,y,z);
 
 	return obj;
 }
@@ -422,7 +441,7 @@ void GlPlot_impl::initialiseGL()
 	// geometries
 	{
 		GlPlotObj coords = CreateCoordinateCross(-2.5, 2.5);
-		GlPlotObj obj1 = CreateArrow(0.1, 4., 0.,0.,0.,  0.,0.,0.75,1.);
+		GlPlotObj obj1 = CreateArrow(0.05, 1., 0.,0.,0.5,  0.,0.,0.75,1.);
 		//GlPlotObj obj1 = CreateCone(1., 1., 0.,0.,0.,  0.,0.5,0.,1.);
 		//GlPlotObj obj2 = CreateSphere(0.2, 0.,0.,2., 0.,0.,1.,1.);
 		//GlPlotObj obj3 = CreateCylinder(0.2, 0.5, 0.,0.,-2., 0.,0.,1.,1.);

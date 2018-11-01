@@ -29,6 +29,9 @@
 #define _GL_FUNC_IMPL(MAJ, MIN) QOpenGLFunctions_ ## MAJ ## _ ## MIN ## _Core
 #define _GL_FUNC(MAJ, MIN) _GL_FUNC_IMPL(MAJ, MIN)
 using qgl_funcs = _GL_FUNC(_GL_MAJ_VER, _GL_MIN_VER);
+
+// GL surface format
+extern void set_gl_format(bool bCore=1, int iMajorVer=3, int iMinorVer=3);
 // ----------------------------------------------------------------------------
 
 #define _GL_USE_TIMER 0

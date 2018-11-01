@@ -4,20 +4,19 @@
  * @date Oct-2018
  * @license: see 'LICENSE.GPL' file
  */
-#include "../glplot_nothread/glplot.h"
 
 #include <QtCore/QSettings>
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QGridLayout>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QLineEdit>
-#include <QtGui/QSurfaceFormat>
 
 #include <locale>
 #include <iostream>
 #include <vector>
 #include <string>
 
+#include "../glplot/glplot_nothread.h"
 #include "libs/math_algos.h"
 #include "libs/math_conts.h"
 
@@ -207,24 +206,6 @@ static inline void set_locales()
 	::setlocale(LC_ALL, "C");
 	std::locale::global(std::locale("C"));
 	QLocale::setDefault(QLocale::C);
-}
-
-
-static inline void set_gl_format(bool bCore=1, int iMajorVer=3, int iMinorVer=3)
-{
-	QSurfaceFormat surf = QSurfaceFormat::defaultFormat();
-
-	surf.setRenderableType(QSurfaceFormat::OpenGL);
-	if(bCore)
-		surf.setProfile(QSurfaceFormat::CoreProfile);
-	else
-		surf.setProfile(QSurfaceFormat::CompatibilityProfile);
-	surf.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
-
-	if(iMajorVer > 0 && iMinorVer > 0)
-		surf.setVersion(iMajorVer, iMinorVer);
-
-	QSurfaceFormat::setDefaultFormat(surf);
 }
 
 
