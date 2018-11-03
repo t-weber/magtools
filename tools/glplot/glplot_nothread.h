@@ -86,6 +86,8 @@ private:
 
 	t_mat_gl m_mat = m::unit<t_mat_gl>();
 
+	bool m_visible = true;
+
 	t_vec3_gl m_labelPos = m::create<t_vec3_gl>({0., 0., 0.});
 	std::string m_label;
 

@@ -91,7 +91,6 @@ protected slots:
 	{
 		if(!m_3dobjsReady)		// create 3d objects
 		{
-			m_plot->GetImpl()->AddCoordinateCross(-2.5, 2.5);
 			m_arrow_pi = m_plot->GetImpl()->AddArrow(0.05, 1., 0.,0.,0.5,  0.,0.,0.85,1.);
 			m_arrow_pf = m_plot->GetImpl()->AddArrow(0.05, 1., 0.,0.,0.5,  0.,0.85,0.,1.);
 			m_arrow_M_Re = m_plot->GetImpl()->AddArrow(0.05, 1., 0.,0.,0.5,  0.85,0.,0.,1.);

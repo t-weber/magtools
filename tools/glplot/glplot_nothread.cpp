@@ -459,14 +459,15 @@ void GlPlot_impl::initialiseGL()
 	LOGGLERR(pGl);
 
 
-	// test geometries
-	/*{
+	// 3d objects
+	{
 		AddCoordinateCross(-2.5, 2.5);
-		AddArrow(0.05, 1., 0.,0.,0.5,  0.,0.,0.75,1.);
-		AddCone(1., 1., 0.,0.,0.,  0.,0.5,0.,1.);
-		AddSphere(0.2, 0.,0.,2., 0.,0.,1.,1.);
-		AddCylinder(0.2, 0.5, 0.,0.,-2., 0.,0.,1.,1.);
-	}*/
+
+		//AddArrow(0.05, 1., 0.,0.,0.5,  0.,0.,0.75,1.);
+		//AddCone(1., 1., 0.,0.,0.,  0.,0.5,0.,1.);
+		//AddSphere(0.2, 0.,0.,2., 0.,0.,1.,1.);
+		//AddCylinder(0.2, 0.5, 0.,0.,-2., 0.,0.,1.,1.);
+	}
 
 
 	// options
@@ -561,6 +562,8 @@ void GlPlot_impl::paintGL()
 		// render objects
 		for(auto& obj : m_objs)
 		{
+			if(!obj.m_visible) continue;
+
 			// main vertex array object
 			pGl->glBindVertexArray(obj.m_vertexarr);
 
@@ -595,9 +598,6 @@ void GlPlot_impl::paintGL()
 
 	// qt painting
 	{
-		//painter.drawLine(GlToScreenCoords(m::create<t_vec_gl>({-2.,0.,0.,1.})),
-		//	GlToScreenCoords(m::create<t_vec_gl>({2.,0.,0.,1.})));
-
 		// coordinate labels
 		painter.drawText(GlToScreenCoords(m::create<t_vec_gl>({0.,0.,0.,1.})), "0");
 		for(t_real_gl f=-2.; f<=2.; f+=0.5)
@@ -620,10 +620,31 @@ void GlPlot_impl::paintGL()
 		// render object labels
 		for(auto& obj : m_objs)
 		{
+			if(!obj.m_visible) continue;
+
 			if(obj.m_label != "")
 			{
-				t_vec3_gl pos = obj.m_mat * obj.m_labelPos;
-				painter.drawText(GlToScreenCoords(m::create<t_vec_gl>({pos[0], pos[1], pos[2], 1.})), obj.m_label.c_str());
+				t_vec3_gl posLabel3d = obj.m_mat * obj.m_labelPos;
+				auto posLabel2d = GlToScreenCoords(m::create<t_vec_gl>({posLabel3d[0], posLabel3d[1], posLabel3d[2], 1.}));
+
+				QFont fontOrig = painter.font();
+				QPen penOrig = painter.pen();
+				QFont fontLabel = fontOrig;
+				QPen penLabel = penOrig;
+
+				fontLabel.setWeight(QFont::Medium);
+				painter.setFont(fontLabel);
+				painter.drawText(posLabel2d, obj.m_label.c_str());
+
+				fontLabel.setWeight(QFont::Normal);
+				penLabel.setColor(QColor(int(obj.m_color[0]*255.), int(obj.m_color[1]*255.), int(obj.m_color[2]*255.), int(obj.m_color[3]*255.)));
+				painter.setFont(fontLabel);
+				painter.setPen(penLabel);
+				painter.drawText(posLabel2d, obj.m_label.c_str());
+
+				// restore original styles
+				painter.setFont(fontOrig);
+				painter.setPen(penOrig);
 			}
 		}
 	}
@@ -740,7 +761,7 @@ void GlPlot_impl::updatePicker()
 
 	for(auto& obj : m_objs)
 	{
-		if(obj.m_type != GlPlotObjType::TRIANGLES)
+		if(obj.m_type != GlPlotObjType::TRIANGLES || !obj.m_visible)
 			continue;
 
 		t_real_gl objcol[4*3];
