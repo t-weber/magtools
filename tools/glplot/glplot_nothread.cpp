@@ -260,10 +260,15 @@ t_mat_gl GlPlot_impl::GetArrowMatrix(const t_vec_gl& vecTo, t_real_gl scale, con
 
 void GlPlot_impl::SetObjectMatrix(std::size_t idx, const t_mat_gl& mat)
 {
-	if(idx >= m_objs.size())
-		return;
-
+	if(idx >= m_objs.size()) return;
 	m_objs[idx].m_mat = mat;
+}
+
+
+void GlPlot_impl::SetObjectLabel(std::size_t idx, const std::string& label)
+{
+	if(idx >= m_objs.size()) return;
+	m_objs[idx].m_label = label;
 }
 
 
@@ -319,6 +324,7 @@ std::size_t GlPlot_impl::AddArrow(t_real_gl rad, t_real_gl h, t_real_gl x, t_rea
 
 	auto obj = CreateTriangleObject(std::get<0>(solid), triagverts, norms, m::create<t_vec_gl>({r,g,b,a}), false);
 	obj.m_mat = GetArrowMatrix(m::create<t_vec_gl>({1,0,0}), 1., m::create<t_vec_gl>({x,y,z}), m::create<t_vec_gl>({0,0,1}));
+	obj.m_labelPos = m::create<t_vec3_gl>({0., 0., 0.75});
 	m_objs.emplace_back(std::move(obj));
 
 	return m_objs.size()-1;		// object handle
@@ -552,7 +558,7 @@ void GlPlot_impl::paintGL()
 		// set cam matrix
 		m_pShaders->setUniformValue(m_uniMatrixCam, m_matCam);
 
-		// triangle geometry
+		// render objects
 		for(auto& obj : m_objs)
 		{
 			// main vertex array object
@@ -609,6 +615,17 @@ void GlPlot_impl::paintGL()
 		painter.drawText(GlToScreenCoords(m::create<t_vec_gl>({3.,0.,0.,1.})), "x");
 		painter.drawText(GlToScreenCoords(m::create<t_vec_gl>({0.,3.,0.,1.})), "y");
 		painter.drawText(GlToScreenCoords(m::create<t_vec_gl>({0.,0.,3.,1.})), "z");
+
+
+		// render object labels
+		for(auto& obj : m_objs)
+		{
+			if(obj.m_label != "")
+			{
+				t_vec3_gl pos = obj.m_mat * obj.m_labelPos;
+				painter.drawText(GlToScreenCoords(m::create<t_vec_gl>({pos[0], pos[1], pos[2], 1.})), obj.m_label.c_str());
+			}
+		}
 	}
 }
 

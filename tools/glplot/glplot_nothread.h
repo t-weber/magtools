@@ -31,7 +31,7 @@
 using qgl_funcs = _GL_FUNC(_GL_MAJ_VER, _GL_MIN_VER);
 
 // GL surface format
-extern void set_gl_format(bool bCore=1, int iMajorVer=3, int iMinorVer=3);
+extern void set_gl_format(bool bCore=true, int iMajorVer=3, int iMinorVer=3);
 // ----------------------------------------------------------------------------
 
 #define _GL_USE_TIMER 0
@@ -85,6 +85,9 @@ private:
 	t_vec_gl m_color = m::create<t_vec_gl>({ 0., 0., 1., 1. });	// rgba
 
 	t_mat_gl m_mat = m::unit<t_mat_gl>();
+
+	t_vec3_gl m_labelPos = m::create<t_vec3_gl>({0., 0., 0.});
+	std::string m_label;
 
 public:
 	GlPlotObj() = default;
@@ -162,9 +165,11 @@ public:
 		t_real_gl r=0, t_real_gl g=0, t_real_gl b=0, t_real_gl a=1);
 	std::size_t AddCoordinateCross(t_real_gl min, t_real_gl max);
 
-	void SetObjectMatrix(std::size_t idx, const t_mat_gl& mat);
-	static t_mat_gl GetArrowMatrix(const t_vec_gl& vecTo, t_real_gl scale, const t_vec_gl& vecTrans = m::create<t_vec_gl>({0,0,0.5}), const t_vec_gl& vecFrom = m::create<t_vec_gl>({0,0,1}));
+	static t_mat_gl GetArrowMatrix(const t_vec_gl& vecTo, t_real_gl scale, 
+		const t_vec_gl& vecTrans = m::create<t_vec_gl>({0,0,0.5}), const t_vec_gl& vecFrom = m::create<t_vec_gl>({0,0,1}));
 
+	void SetObjectMatrix(std::size_t idx, const t_mat_gl& mat);
+	void SetObjectLabel(std::size_t idx, const std::string& label);
 
 protected slots:
 	void tick();

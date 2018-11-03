@@ -97,6 +97,11 @@ protected slots:
 			m_arrow_M_Re = m_plot->GetImpl()->AddArrow(0.05, 1., 0.,0.,0.5,  0.85,0.,0.,1.);
 			m_arrow_M_Im = m_plot->GetImpl()->AddArrow(0.05, 1., 0.,0.,0.5,  0.85,0.85,0.,1.);
 
+			m_plot->GetImpl()->SetObjectLabel(m_arrow_pi, "P_i");
+			m_plot->GetImpl()->SetObjectLabel(m_arrow_pf, "P_f");
+			m_plot->GetImpl()->SetObjectLabel(m_arrow_M_Re, "Re{M_perp}");
+			m_plot->GetImpl()->SetObjectLabel(m_arrow_M_Im, "Im{M_perp}");
+
 			m_3dobjsReady = true;
 			CalcPol();
 		}
