@@ -264,11 +264,16 @@ void GlPlot_impl::SetObjectMatrix(std::size_t idx, const t_mat_gl& mat)
 	m_objs[idx].m_mat = mat;
 }
 
-
 void GlPlot_impl::SetObjectLabel(std::size_t idx, const std::string& label)
 {
 	if(idx >= m_objs.size()) return;
 	m_objs[idx].m_label = label;
+}
+
+void GlPlot_impl::SetObjectVisible(std::size_t idx, bool visible)
+{
+	if(idx >= m_objs.size()) return;
+	m_objs[idx].m_visible = visible;
 }
 
 

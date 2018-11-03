@@ -285,20 +285,24 @@ public:
 			m_plot->GetImpl()->SetObjectMatrix(m_arrow_pf, matPf);
 
 			// Re(M)
+			const t_real_gl lenReM = t_real_gl(std::sqrt(MPerpReX*MPerpReX + MPerpReY*MPerpReY + MPerpReZ*MPerpReZ));
 			t_mat_gl matMRe = GlPlot_impl::GetArrowMatrix(
 				m::create<t_vec_gl>({t_real_gl(MPerpReX), t_real_gl(MPerpReY), t_real_gl(MPerpReZ)}), 	// to
-				1., 								// scale
+				lenReM,								// scale
 				m::create<t_vec_gl>({0,0,0.5}),		// translate 
 				m::create<t_vec_gl>({0,0,1}));		// from
 			m_plot->GetImpl()->SetObjectMatrix(m_arrow_M_Re, matMRe);
+			m_plot->GetImpl()->SetObjectVisible(m_arrow_M_Re, !m::equals(lenReM, t_real_gl(0)));
 
 			// Im(M)
+			const t_real_gl lenImM = t_real_gl(std::sqrt(MPerpImX*MPerpImX + MPerpImY*MPerpImY + MPerpImZ*MPerpImZ));
 			t_mat_gl matMIm = GlPlot_impl::GetArrowMatrix(
 				m::create<t_vec_gl>({t_real_gl(MPerpImX), t_real_gl(MPerpImY), t_real_gl(MPerpImZ)}), 	// to
-				1., 								// scale
+				lenImM,								// scale
 				m::create<t_vec_gl>({0,0,0.5}),		// translate 
 				m::create<t_vec_gl>({0,0,1}));		// from
 			m_plot->GetImpl()->SetObjectMatrix(m_arrow_M_Im, matMIm);
+			m_plot->GetImpl()->SetObjectVisible(m_arrow_M_Im, !m::equals(lenImM, t_real_gl(0)));
 		}
 	}
 };

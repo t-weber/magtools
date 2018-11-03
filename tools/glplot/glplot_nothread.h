@@ -174,6 +174,7 @@ public:
 
 	void SetObjectMatrix(std::size_t idx, const t_mat_gl& mat);
 	void SetObjectLabel(std::size_t idx, const std::string& label);
+	void SetObjectVisible(std::size_t idx, bool visible);
 
 	const std::string& GetGlDescr() const { return m_strGlDescr; }
 
