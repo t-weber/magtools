@@ -752,42 +752,75 @@ void GlPlot_impl::EndRotation()
 
 void GlPlot_impl::updatePicker()
 {
+	const bool show_picked_triangle = false;
+
 	auto [org, dir] = m::hom_line_from_screen_coords<t_mat_gl, t_vec_gl>(
 		m_posMouse.x(), m_posMouse.y(), 0., 1., m_matCam_inv,
 		m_matPerspective_inv, m_matViewport_inv, &m_matViewport, true);
 
-	// 3 vertices with rgba color
-	t_real_gl red[] = {1.,0.,0.,1., 1.,0.,0.,1., 1.,0.,0.,1.};
+	// 3 vertices with rgba colour
+	const t_real_gl colSelected[] = {1.,1.,1.,1., 1.,1.,1.,1., 1.,1.,1.,1.};
 
-	for(auto& obj : m_objs)
+	bool hasInters = false;
+	t_vec3_gl vecClosestInters = m::create<t_vec3_gl>({0,0,0});
+	std::size_t objInters = 0;
+
+	for(std::size_t curObj=0; curObj<m_objs.size(); ++curObj)
 	{
+		auto& obj = m_objs[curObj];
+
 		if(obj.m_type != GlPlotObjType::TRIANGLES || !obj.m_visible)
 			continue;
 
+		//obj.m_pickerInters.clear();
+
 		t_real_gl objcol[4*3];
-		// TODO: only works if qvector4d stores its data linearly!
-		std::copy(&obj.m_color[0], &obj.m_color[0]+4, objcol+0*4);
-		std::copy(&obj.m_color[0], &obj.m_color[0]+4, objcol+1*4);
-		std::copy(&obj.m_color[0], &obj.m_color[0]+4, objcol+2*4);
+		if(show_picked_triangle)
+		{
+			// TODO: only works if qvector4d stores its data linearly!
+			std::copy(&obj.m_color[0], &obj.m_color[0]+4, objcol+0*4);
+			std::copy(&obj.m_color[0], &obj.m_color[0]+4, objcol+1*4);
+			std::copy(&obj.m_color[0], &obj.m_color[0]+4, objcol+2*4);
+		}
 
 		obj.m_pcolorbuf->bind();
 		BOOST_SCOPE_EXIT(&obj) { obj.m_pcolorbuf->release(); } BOOST_SCOPE_EXIT_END
 
 		for(std::size_t startidx=0; startidx+2<obj.m_triangles.size(); startidx+=3)
 		{
-			std::vector<t_vec3_gl> poly{{
-				obj.m_triangles[startidx+0],
-				obj.m_triangles[startidx+1],
-				obj.m_triangles[startidx+2] }};
+			std::vector<t_vec3_gl> poly{{ obj.m_triangles[startidx+0], obj.m_triangles[startidx+1], obj.m_triangles[startidx+2] }};
 			auto [vecInters, bInters, lamInters] =
 				m::intersect_line_poly<t_vec3_gl, t_mat_gl>(
 					t_vec3_gl(org[0], org[1], org[2]), t_vec3_gl(dir[0], dir[1], dir[2]),
 					poly, obj.m_mat);
 
-			if(bInters)
-				obj.m_pcolorbuf->write(sizeof(red[0])*startidx*4, red, sizeof(red));
+			if(!hasInters)
+			{	// first intersection
+				vecClosestInters = vecInters;
+				objInters = curObj;
+				hasInters = true;
+			}
 			else
-				obj.m_pcolorbuf->write(sizeof(objcol[0])*startidx*4, objcol, sizeof(objcol));
+			{	// test if next intersection is closer?
+				t_vec3_gl oldPosTrafo = m_matCam * obj.m_mat * vecClosestInters;
+				t_vec3_gl newPosTrafo = m_matCam * obj.m_mat * vecInters;
+
+				if(m::norm(newPosTrafo) < m::norm(oldPosTrafo))
+				{	// it is closer
+					vecClosestInters = vecInters;
+					objInters = curObj;
+				}
+			}
+
+			//obj.m_pickerInters.emplace_back(std::move(vecInters));
+
+			if(show_picked_triangle)
+			{
+				if(bInters)
+					obj.m_pcolorbuf->write(sizeof(colSelected[0])*startidx*4, colSelected, sizeof(colSelected));
+				else
+					obj.m_pcolorbuf->write(sizeof(objcol[0])*startidx*4, objcol, sizeof(objcol));
+			}
 		}
 	}
 
