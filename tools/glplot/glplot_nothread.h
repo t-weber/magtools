@@ -93,7 +93,7 @@ public:
 
 
 class GlPlot_impl : public QObject
-{
+{ Q_OBJECT
 public:
 	GlPlot_impl(GlPlot* pPlot);
 	virtual ~GlPlot_impl();
@@ -107,6 +107,11 @@ protected:
 	void tick(const std::chrono::milliseconds& ms);
 	void updatePicker();
 	void updateCam();
+
+	GlPlotObj CreateTriangleObject(const std::vector<t_vec3_gl>& verts,
+		const std::vector<t_vec3_gl>& triag_verts, const std::vector<t_vec3_gl>& norms,
+		const t_vec_gl& color, bool bUseVertsAsNorm=false);
+	GlPlotObj CreateLineObject(const std::vector<t_vec3_gl>& verts, const t_vec_gl& color);
 
 private:
 	std::atomic<bool> m_bPickerNeedsUpdate = false;
@@ -143,24 +148,23 @@ public:
 	void SetScreenDims(int w, int h);
 
 public:
-	GlPlotObj CreateTriangleObject(const std::vector<t_vec3_gl>& verts,
-		const std::vector<t_vec3_gl>& triag_verts, const std::vector<t_vec3_gl>& norms,
-		const t_vec_gl& color, bool bUseVertsAsNorm=false);
-	GlPlotObj CreateLineObject(const std::vector<t_vec3_gl>& verts, const t_vec_gl& color);
+	std::size_t AddSphere(t_real_gl rad=1,
+		t_real_gl x=0, t_real_gl y=0, t_real_gl z=0,
+		t_real_gl r=0, t_real_gl g=0, t_real_gl b=0, t_real_gl a=1);
+	std::size_t AddCylinder(t_real_gl rad=1, t_real_gl h=1,
+		t_real_gl x=0, t_real_gl y=0, t_real_gl z=0,
+		t_real_gl r=0, t_real_gl g=0, t_real_gl b=0, t_real_gl a=1);
+	std::size_t AddCone(t_real_gl rad=1, t_real_gl h=1,
+		t_real_gl x=0, t_real_gl y=0, t_real_gl z=0,
+		t_real_gl r=0, t_real_gl g=0, t_real_gl b=0, t_real_gl a=1);
+	std::size_t AddArrow(t_real_gl rad=1, t_real_gl h=1,
+		t_real_gl x=0, t_real_gl y=0, t_real_gl z=0,
+		t_real_gl r=0, t_real_gl g=0, t_real_gl b=0, t_real_gl a=1);
+	std::size_t AddCoordinateCross(t_real_gl min, t_real_gl max);
 
-	GlPlotObj CreateSphere(t_real_gl rad=1,
-		t_real_gl x=0, t_real_gl y=0, t_real_gl z=0,
-		t_real_gl r=0, t_real_gl g=0, t_real_gl b=0, t_real_gl a=1);
-	GlPlotObj CreateCylinder(t_real_gl rad=1, t_real_gl h=1,
-		t_real_gl x=0, t_real_gl y=0, t_real_gl z=0,
-		t_real_gl r=0, t_real_gl g=0, t_real_gl b=0, t_real_gl a=1);
-	GlPlotObj CreateCone(t_real_gl rad=1, t_real_gl h=1,
-		t_real_gl x=0, t_real_gl y=0, t_real_gl z=0,
-		t_real_gl r=0, t_real_gl g=0, t_real_gl b=0, t_real_gl a=1);
-	GlPlotObj CreateArrow(t_real_gl rad=1, t_real_gl h=1,
-		t_real_gl x=0, t_real_gl y=0, t_real_gl z=0,
-		t_real_gl r=0, t_real_gl g=0, t_real_gl b=0, t_real_gl a=1);
-	GlPlotObj CreateCoordinateCross(t_real_gl min, t_real_gl max);
+	void SetObjectMatrix(std::size_t idx, const t_mat_gl& mat);
+	static t_mat_gl GetArrowMatrix(const t_vec_gl& vecTo, t_real_gl scale, const t_vec_gl& vecTrans = m::create<t_vec_gl>({0,0,0.5}), const t_vec_gl& vecFrom = m::create<t_vec_gl>({0,0,1}));
+
 
 protected slots:
 	void tick();
@@ -180,12 +184,15 @@ public slots:
 
 
 class GlPlot : public QOpenGLWidget
-{
+{ Q_OBJECT
 public:
 	using QOpenGLWidget::QOpenGLWidget;
 
 	GlPlot(QWidget *pParent);
 	virtual ~GlPlot();
+
+public:
+	GlPlot_impl* GetImpl() { return m_impl.get(); }
 
 protected:
 	virtual void paintGL() override;
@@ -199,6 +206,9 @@ protected:
 
 private:
 	std::unique_ptr<GlPlot_impl> m_impl;
+
+signals:
+	void afterGLInitialisation();
 };
 
 

@@ -174,6 +174,7 @@ GlPlotObj GlPlot_impl::CreateTriangleObject(const std::vector<t_vec3_gl>& verts,
 
 	obj.m_vertices = std::move(verts);
 	obj.m_triangles = std::move(triagverts);
+	LOGGLERR(pGl)
 
 	return obj;
 }
@@ -241,12 +242,32 @@ GlPlotObj GlPlot_impl::CreateLineObject(const std::vector<t_vec3_gl>& verts, con
 
 
 	obj.m_vertices = std::move(verts);
+	LOGGLERR(pGl)
 
 	return obj;
 }
 
 
-GlPlotObj GlPlot_impl::CreateSphere(t_real_gl rad, t_real_gl x, t_real_gl y, t_real_gl z,
+t_mat_gl GlPlot_impl::GetArrowMatrix(const t_vec_gl& vecTo, t_real_gl scale, const t_vec_gl& vecTrans, const t_vec_gl& vecFrom)
+{
+	t_mat_gl mat = m::rotation<t_mat_gl, t_vec_gl>(vecFrom, vecTo);
+	mat *= m::hom_scaling<t_mat_gl>(scale, scale, scale);
+	mat *= m::hom_translation<t_mat_gl>(vecTrans[0], vecTrans[1], vecTrans[2]);
+
+	return mat;
+}
+
+
+void GlPlot_impl::SetObjectMatrix(std::size_t idx, const t_mat_gl& mat)
+{
+	if(idx >= m_objs.size())
+		return;
+
+	m_objs[idx].m_mat = mat;
+}
+
+
+std::size_t GlPlot_impl::AddSphere(t_real_gl rad, t_real_gl x, t_real_gl y, t_real_gl z,
 	t_real_gl r, t_real_gl g, t_real_gl b, t_real_gl a)
 {
 	auto solid = m::create_icosahedron<t_vec3_gl>(1);
@@ -255,63 +276,56 @@ GlPlotObj GlPlot_impl::CreateSphere(t_real_gl rad, t_real_gl x, t_real_gl y, t_r
 			m::create_triangles<t_vec3_gl>(solid), 2), rad);
 
 	auto obj = CreateTriangleObject(std::get<0>(solid), triagverts, norms, m::create<t_vec_gl>({r,g,b,a}), true);
+	obj.m_mat = m::hom_translation<t_mat_gl>(x, y, z);
+	m_objs.emplace_back(std::move(obj));
 
-	obj.m_mat(0,3) = x;
-	obj.m_mat(1,3) = y;
-	obj.m_mat(2,3) = z;
-
-	return obj;
+	return m_objs.size()-1;		// object handle
 }
 
 
-GlPlotObj GlPlot_impl::CreateCylinder(t_real_gl rad, t_real_gl h, t_real_gl x, t_real_gl y, t_real_gl z,
+std::size_t GlPlot_impl::AddCylinder(t_real_gl rad, t_real_gl h, t_real_gl x, t_real_gl y, t_real_gl z,
 	t_real_gl r, t_real_gl g, t_real_gl b, t_real_gl a)
 {
 	auto solid = m::create_cylinder<t_vec3_gl>(rad, h, true);
 	auto [triagverts, norms, uvs] = m::create_triangles<t_vec3_gl>(solid);
 
 	auto obj = CreateTriangleObject(std::get<0>(solid), triagverts, norms, m::create<t_vec_gl>({r,g,b,a}), false);
+	obj.m_mat = m::hom_translation<t_mat_gl>(x, y, z);
+	m_objs.emplace_back(std::move(obj));
 
-	obj.m_mat(0,3) = x;
-	obj.m_mat(1,3) = y;
-	obj.m_mat(2,3) = z;
-
-	return obj;
+	return m_objs.size()-1;		// object handle
 }
 
 
-GlPlotObj GlPlot_impl::CreateCone(t_real_gl rad, t_real_gl h, t_real_gl x, t_real_gl y, t_real_gl z,
+std::size_t GlPlot_impl::AddCone(t_real_gl rad, t_real_gl h, t_real_gl x, t_real_gl y, t_real_gl z,
 	t_real_gl r, t_real_gl g, t_real_gl b, t_real_gl a)
 {
 	auto solid = m::create_cone<t_vec3_gl>(rad, h);
 	auto [triagverts, norms, uvs] = m::create_triangles<t_vec3_gl>(solid);
 
 	auto obj = CreateTriangleObject(std::get<0>(solid), triagverts, norms, m::create<t_vec_gl>({r,g,b,a}), false);
+	obj.m_mat = m::hom_translation<t_mat_gl>(x, y, z);
+	m_objs.emplace_back(std::move(obj));
 
-	obj.m_mat(0,3) = x;
-	obj.m_mat(1,3) = y;
-	obj.m_mat(2,3) = z;
-
-	return obj;
+	return m_objs.size()-1;		// object handle
 }
 
 
-GlPlotObj GlPlot_impl::CreateArrow(t_real_gl rad, t_real_gl h, t_real_gl x, t_real_gl y, t_real_gl z,
+std::size_t GlPlot_impl::AddArrow(t_real_gl rad, t_real_gl h, t_real_gl x, t_real_gl y, t_real_gl z,
 	t_real_gl r, t_real_gl g, t_real_gl b, t_real_gl a)
 {
 	auto solid = m::create_cylinder<t_vec3_gl>(rad, h, 2, 32, rad, rad*1.5);
 	auto [triagverts, norms, uvs] = m::create_triangles<t_vec3_gl>(solid);
 
 	auto obj = CreateTriangleObject(std::get<0>(solid), triagverts, norms, m::create<t_vec_gl>({r,g,b,a}), false);
+	obj.m_mat = GetArrowMatrix(m::create<t_vec_gl>({1,0,0}), 1., m::create<t_vec_gl>({x,y,z}), m::create<t_vec_gl>({0,0,1}));
+	m_objs.emplace_back(std::move(obj));
 
-	obj.m_mat = m::rotation<t_mat_gl, t_vec_gl>(m::create<t_vec_gl>({0,0,1}), m::create<t_vec_gl>({1,1,0}));
-	obj.m_mat *= m::hom_translation<t_mat_gl>(x,y,z);
-
-	return obj;
+	return m_objs.size()-1;		// object handle
 }
 
 
-GlPlotObj GlPlot_impl::CreateCoordinateCross(t_real_gl min, t_real_gl max)
+std::size_t GlPlot_impl::AddCoordinateCross(t_real_gl min, t_real_gl max)
 {
 	auto col = m::create<t_vec_gl>({0,0,0,1});
 	auto verts = std::vector<t_vec3_gl>
@@ -322,8 +336,9 @@ GlPlotObj GlPlot_impl::CreateCoordinateCross(t_real_gl min, t_real_gl max)
 	}};
 
 	auto obj = CreateLineObject(verts, col);
+	m_objs.emplace_back(std::move(obj));
 
-	return obj;
+	return m_objs.size()-1;		// object handle
 }
 
 
@@ -438,19 +453,14 @@ void GlPlot_impl::initialiseGL()
 	LOGGLERR(pGl);
 
 
-	// geometries
-	{
-		GlPlotObj coords = CreateCoordinateCross(-2.5, 2.5);
-		GlPlotObj obj1 = CreateArrow(0.05, 1., 0.,0.,0.5,  0.,0.,0.75,1.);
-		//GlPlotObj obj1 = CreateCone(1., 1., 0.,0.,0.,  0.,0.5,0.,1.);
-		//GlPlotObj obj2 = CreateSphere(0.2, 0.,0.,2., 0.,0.,1.,1.);
-		//GlPlotObj obj3 = CreateCylinder(0.2, 0.5, 0.,0.,-2., 0.,0.,1.,1.);
-		m_objs.emplace_back(std::move(coords));
-		m_objs.emplace_back(std::move(obj1));
-		//m_objs.emplace_back(std::move(obj2));
-		//m_objs.emplace_back(std::move(obj3));
-	}
-	LOGGLERR(pGl);
+	// test geometries
+	/*{
+		AddCoordinateCross(-2.5, 2.5);
+		AddArrow(0.05, 1., 0.,0.,0.5,  0.,0.,0.75,1.);
+		AddCone(1., 1., 0.,0.,0.,  0.,0.5,0.,1.);
+		AddSphere(0.2, 0.,0.,2., 0.,0.,1.,1.);
+		AddCylinder(0.2, 0.5, 0.,0.,-2., 0.,0.,1.,1.);
+	}*/
 
 
 	// options
@@ -751,12 +761,10 @@ void GlPlot_impl::updatePicker()
 // ----------------------------------------------------------------------------
 // GLPlot wrapper class
 
-GlPlot::GlPlot(QWidget *pParent) : QOpenGLWidget(pParent),
-	m_impl(std::make_unique<GlPlot_impl>(this))
+GlPlot::GlPlot(QWidget *pParent) : QOpenGLWidget(pParent), m_impl(std::make_unique<GlPlot_impl>(this))
 {
 	setMouseTracking(true);
 }
-
 
 GlPlot::~GlPlot()
 {
@@ -767,15 +775,14 @@ GlPlot::~GlPlot()
 void GlPlot::initializeGL()
 {
 	m_impl->initialiseGL();
+	emit afterGLInitialisation();
 }
-
 
 void GlPlot::resizeGL(int w, int h)
 {
 	m_impl->SetScreenDims(w, h);
 	m_impl->resizeGL();
 }
-
 
 void GlPlot::paintGL()
 {

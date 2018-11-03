@@ -54,6 +54,13 @@ private:
 	QLineEdit* m_editPfY = new QLineEdit(this);
 	QLineEdit* m_editPfZ = new QLineEdit(this);
 
+	// 3d object handles
+	std::size_t m_arrow_pi = 0;
+	std::size_t m_arrow_pf = 0;
+	std::size_t m_arrow_M_Re = 0;
+	std::size_t m_arrow_M_Im = 0;
+	bool m_3dobjsReady = false;
+
 
 protected:
 	virtual void closeEvent(QCloseEvent *evt) override
@@ -76,12 +83,36 @@ protected:
 	}
 
 
+protected slots:
+	/**
+	 * called after the plotter has initialised
+	 */
+	void afterGLInitialisation()
+	{
+		if(!m_3dobjsReady)		// create 3d objects
+		{
+			m_plot->GetImpl()->AddCoordinateCross(-2.5, 2.5);
+			m_arrow_pi = m_plot->GetImpl()->AddArrow(0.05, 1., 0.,0.,0.5,  0.,0.,0.85,1.);
+			m_arrow_pf = m_plot->GetImpl()->AddArrow(0.05, 1., 0.,0.,0.5,  0.,0.85,0.,1.);
+			m_arrow_M_Re = m_plot->GetImpl()->AddArrow(0.05, 1., 0.,0.,0.5,  0.85,0.,0.,1.);
+			m_arrow_M_Im = m_plot->GetImpl()->AddArrow(0.05, 1., 0.,0.,0.5,  0.85,0.85,0.,1.);
+
+			m_3dobjsReady = true;
+			CalcPol();
+		}
+	}
+
+
 public:
 	using QDialog::QDialog;
 
+	/**
+	 * create UI
+	 */
 	PolDlg(QWidget* pParent) : QDialog{pParent, Qt::Window}
 	{
 		setWindowTitle("Polarisation");
+		setSizeGripEnabled(true);
 
 
 		auto labelN = new QLabel("Re{N}, Im{N}:", this);
@@ -97,12 +128,16 @@ public:
 		for(auto* editPf : {m_editPfX, m_editPfY, m_editPfZ})
 			editPf->setReadOnly(true);
 
+
+		// connections
 		for(auto* edit : {m_editNRe, m_editNIm,
 			m_editMPerpReX, m_editMPerpReY, m_editMPerpReZ,
 			m_editMPerpImX, m_editMPerpImY, m_editMPerpImZ,
 			m_editPiX, m_editPiY, m_editPiZ,
 			m_editPfX, m_editPfY, m_editPfZ})
 			connect(edit, &QLineEdit::textEdited, this, &PolDlg::CalcPol);
+
+		connect(m_plot.get(), &GlPlot::afterGLInitialisation, this, &PolDlg::afterGLInitialisation);
 
 
 		auto pGrid = new QGridLayout(this);
@@ -135,8 +170,6 @@ public:
 		pGrid->addWidget(m_editPfZ, 5,3,1,1);
 
 
-		this->setSizeGripEnabled(true);
-
 		// restory window size and position
 		if(m_sett.contains("geo"))
 			restoreGeometry(m_sett.value("geo").toByteArray());
@@ -156,10 +189,14 @@ public:
 		if(m_sett.contains("piy")) m_editPiY->setText(m_sett.value("piy").toString());
 		if(m_sett.contains("piz")) m_editPiZ->setText(m_sett.value("piz").toString());
 
+
 		CalcPol();
 	}
 
 
+	/**
+	 * calculate final polarisation vector
+	 */
 	void CalcPol()
 	{
 		// get values from line edits
@@ -191,6 +228,43 @@ public:
 		m_editPfX->setText(std::to_string(P_f[0].real()).c_str());
 		m_editPfY->setText(std::to_string(P_f[1].real()).c_str());
 		m_editPfZ->setText(std::to_string(P_f[2].real()).c_str());
+
+
+		// update 3d objects
+		if(m_3dobjsReady)
+		{
+			// P_i
+			t_mat_gl matPi = GlPlot_impl::GetArrowMatrix(
+				m::create<t_vec_gl>({t_real_gl(PiX), t_real_gl(PiY), t_real_gl(PiZ)}), 	// to
+				1., 								// scale
+				m::create<t_vec_gl>({0,0,0.5}),		// translate 
+				m::create<t_vec_gl>({0,0,1}));		// from
+			m_plot->GetImpl()->SetObjectMatrix(m_arrow_pi, matPi);
+
+			// P_f
+			t_mat_gl matPf = GlPlot_impl::GetArrowMatrix(
+				m::create<t_vec_gl>({t_real_gl(P_f[0].real()), t_real_gl(P_f[1].real()), t_real_gl(P_f[2].real())}), 	// to
+				1., 								// scale
+				m::create<t_vec_gl>({0,0,0.5}),		// translate 
+				m::create<t_vec_gl>({0,0,1}));		// from
+			m_plot->GetImpl()->SetObjectMatrix(m_arrow_pf, matPf);
+
+			// Re(M)
+			t_mat_gl matMRe = GlPlot_impl::GetArrowMatrix(
+				m::create<t_vec_gl>({t_real_gl(MPerpReX), t_real_gl(MPerpReY), t_real_gl(MPerpReZ)}), 	// to
+				1., 								// scale
+				m::create<t_vec_gl>({0,0,0.5}),		// translate 
+				m::create<t_vec_gl>({0,0,1}));		// from
+			m_plot->GetImpl()->SetObjectMatrix(m_arrow_M_Re, matMRe);
+
+			// Im(M)
+			t_mat_gl matMIm = GlPlot_impl::GetArrowMatrix(
+				m::create<t_vec_gl>({t_real_gl(MPerpImX), t_real_gl(MPerpImY), t_real_gl(MPerpImZ)}), 	// to
+				1., 								// scale
+				m::create<t_vec_gl>({0,0,0.5}),		// translate 
+				m::create<t_vec_gl>({0,0,1}));		// from
+			m_plot->GetImpl()->SetObjectMatrix(m_arrow_M_Im, matMIm);
+		}
 	}
 };
 // ----------------------------------------------------------------------------

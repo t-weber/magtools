@@ -2489,8 +2489,24 @@ requires is_mat<t_mat>
 	return create<t_mat>({
 		1., 	0., 	0., 	x,
 		0., 	1., 	0., 	y,
-		0.,	0.,	1., 	z,
-		0.,	0.,	0.,	1.
+		0.,		0.,		1., 	z,
+		0.,		0.,		0.,		1.
+	});
+}
+
+
+/**
+ * scaling matrix in homogeneous coordinates
+ */
+template<class t_mat, class t_real = typename t_mat::value_type>
+t_mat hom_scaling(t_real x, t_real y, t_real z)
+requires is_mat<t_mat>
+{
+	return create<t_mat>({
+		x, 		0., 	0., 	0.,
+		0., 	y, 		0., 	0.,
+		0.,		0.,		z, 		0.,
+		0.,		0.,		0.,		1.
 	});
 }
 
