@@ -411,12 +411,14 @@ void GlPlot_impl::initialiseGL()
 	// GL functions
 	auto *pGl = GetGlFunctions();
 	if(!pGl) return;
-	std::cerr << __func__ << ": "
-		<< (char*)pGl->glGetString(GL_VERSION) << ", "
+
+	std::ostringstream ostrGlDescr;
+	ostrGlDescr << (char*)pGl->glGetString(GL_VERSION) << ", "
 		<< (char*)pGl->glGetString(GL_VENDOR) << ", "
 		<< (char*)pGl->glGetString(GL_RENDERER) << ", "
-		<< "glsl: " << (char*)pGl->glGetString(GL_SHADING_LANGUAGE_VERSION)
-		<< std::endl;
+		<< "glsl: " << (char*)pGl->glGetString(GL_SHADING_LANGUAGE_VERSION);
+	m_strGlDescr = ostrGlDescr.str();
+	//std::cerr << __func__ << ": " << m_strGlDescr << std::endl;
 	LOGGLERR(pGl);
 
 
@@ -491,7 +493,7 @@ void GlPlot_impl::resizeGL()
 	auto *pContext = m_pPlot->context();
 	if(!pContext) return;
 
-	std::cerr << std::dec << __func__ << ": w = " << w << ", h = " << h << std::endl;
+	//std::cerr << std::dec << __func__ << ": w = " << w << ", h = " << h << std::endl;
 	m_matViewport = m::hom_viewport<t_mat_gl>(w, h, 0., 1.);
 	std::tie(m_matViewport_inv, std::ignore) = m::inv<t_mat_gl>(m_matViewport);
 
@@ -763,7 +765,7 @@ void GlPlot_impl::updatePicker()
 
 	bool hasInters = false;
 	t_vec3_gl vecClosestInters = m::create<t_vec3_gl>({0,0,0});
-	std::size_t objInters = 0;
+	std::size_t objInters = 0xffffffff;
 
 	for(std::size_t curObj=0; curObj<m_objs.size(); ++curObj)
 	{
@@ -794,25 +796,28 @@ void GlPlot_impl::updatePicker()
 					t_vec3_gl(org[0], org[1], org[2]), t_vec3_gl(dir[0], dir[1], dir[2]),
 					poly, obj.m_mat);
 
-			if(!hasInters)
-			{	// first intersection
-				vecClosestInters = vecInters;
-				objInters = curObj;
-				hasInters = true;
-			}
-			else
-			{	// test if next intersection is closer?
-				t_vec3_gl oldPosTrafo = m_matCam * obj.m_mat * vecClosestInters;
-				t_vec3_gl newPosTrafo = m_matCam * obj.m_mat * vecInters;
-
-				if(m::norm(newPosTrafo) < m::norm(oldPosTrafo))
-				{	// it is closer
+			if(bInters)
+			{
+				if(!hasInters)
+				{	// first intersection
 					vecClosestInters = vecInters;
 					objInters = curObj;
+					hasInters = true;
 				}
-			}
+				else
+				{	// test if next intersection is closer...
+					t_vec3_gl oldPosTrafo = m_matCam * obj.m_mat * vecClosestInters;
+					t_vec3_gl newPosTrafo = m_matCam * obj.m_mat * vecInters;
 
-			//obj.m_pickerInters.emplace_back(std::move(vecInters));
+					if(m::norm(newPosTrafo) < m::norm(oldPosTrafo))
+					{	// ...it is closer
+						vecClosestInters = vecInters;
+						objInters = curObj;
+					}
+				}
+
+				//obj.m_pickerInters.emplace_back(std::move(vecInters));
+			}
 
 			if(show_picked_triangle)
 			{
@@ -825,6 +830,7 @@ void GlPlot_impl::updatePicker()
 	}
 
 	m_bPickerNeedsUpdate = false;
+	emit PickerIntersection(hasInters ? &vecClosestInters : nullptr, objInters);
 }
 
 
@@ -846,7 +852,7 @@ GlPlot::~GlPlot()
 void GlPlot::initializeGL()
 {
 	m_impl->initialiseGL();
-	emit afterGLInitialisation();
+	emit AfterGLInitialisation();
 }
 
 void GlPlot::resizeGL(int w, int h)

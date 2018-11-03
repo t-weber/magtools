@@ -122,6 +122,7 @@ protected:
 private:
 	std::atomic<bool> m_bPickerNeedsUpdate = false;
 	GlPlot *m_pPlot = nullptr;
+	std::string m_strGlDescr;
 
 	std::vector<GlPlotObj> m_objs;
 
@@ -174,6 +175,8 @@ public:
 	void SetObjectMatrix(std::size_t idx, const t_mat_gl& mat);
 	void SetObjectLabel(std::size_t idx, const std::string& label);
 
+	const std::string& GetGlDescr() const { return m_strGlDescr; }
+
 protected slots:
 	void tick();
 
@@ -188,6 +191,9 @@ public slots:
 
 	void BeginRotation();
 	void EndRotation();
+
+signals:
+	void PickerIntersection(const t_vec3_gl* pos, std::size_t objIdx);
 };
 
 
@@ -216,7 +222,7 @@ private:
 	std::unique_ptr<GlPlot_impl> m_impl;
 
 signals:
-	void afterGLInitialisation();
+	void AfterGLInitialisation();
 };
 
 

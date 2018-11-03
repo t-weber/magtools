@@ -54,6 +54,9 @@ private:
 	QLineEdit* m_editPfY = new QLineEdit(this);
 	QLineEdit* m_editPfZ = new QLineEdit(this);
 
+	QLabel* m_labelStatus = new QLabel(this);
+
+
 	// 3d object handles
 	std::size_t m_arrow_pi = 0;
 	std::size_t m_arrow_pf = 0;
@@ -87,8 +90,10 @@ protected slots:
 	/**
 	 * called after the plotter has initialised
 	 */
-	void afterGLInitialisation()
+	void AfterGLInitialisation()
 	{
+		std::cerr << "GL device: " + m_plot->GetImpl()->GetGlDescr() << "." << std::endl;
+
 		if(!m_3dobjsReady)		// create 3d objects
 		{
 			m_arrow_pi = m_plot->GetImpl()->AddArrow(0.05, 1., 0.,0.,0.5,  0.,0.,0.85,1.);
@@ -104,6 +109,25 @@ protected slots:
 			m_3dobjsReady = true;
 			CalcPol();
 		}
+	}
+
+
+	/**
+	 * called when the mouse hovers over an object
+	 */
+	void PickerIntersection(const t_vec3_gl* pos, std::size_t objIdx)
+	{
+		/*if(pos)
+		{
+			std::cout << "Intersecting object " << objIdx << " at position "
+				<< (*pos)[0] << ", " << (*pos)[1] << ", " << (*pos)[2] << std::endl;
+		}*/
+
+		if(objIdx == m_arrow_pi) m_labelStatus->setText("P_i");
+		else if(objIdx == m_arrow_pf) m_labelStatus->setText("P_f");
+		else if(objIdx == m_arrow_M_Re) m_labelStatus->setText("Re{M_perp}");
+		else if(objIdx == m_arrow_M_Im) m_labelStatus->setText("Im{M_perp}");
+		else m_labelStatus->setText("");
 	}
 
 
@@ -132,6 +156,10 @@ public:
 		for(auto* editPf : {m_editPfX, m_editPfY, m_editPfZ})
 			editPf->setReadOnly(true);
 
+		m_labelStatus->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+		m_labelStatus->setFrameStyle(QFrame::Sunken | QFrame::Panel);
+		m_labelStatus->setLineWidth(1);
+
 
 		// connections
 		for(auto* edit : {m_editNRe, m_editNIm,
@@ -141,14 +169,15 @@ public:
 			m_editPfX, m_editPfY, m_editPfZ})
 			connect(edit, &QLineEdit::textEdited, this, &PolDlg::CalcPol);
 
-		connect(m_plot.get(), &GlPlot::afterGLInitialisation, this, &PolDlg::afterGLInitialisation);
+		connect(m_plot.get(), &GlPlot::AfterGLInitialisation, this, &PolDlg::AfterGLInitialisation);
+		connect(m_plot->GetImpl(), &GlPlot_impl::PickerIntersection, this, &PolDlg::PickerIntersection);
 
 
 		auto pGrid = new QGridLayout(this);
 		pGrid->setSpacing(4);
 		pGrid->setContentsMargins(8,8,8,8);
 
-		pGrid->addWidget(m_plot.get(), 0,0, 1,4);
+		pGrid->addWidget(m_plot.get(), 0,0,1,4);
 
 		pGrid->addWidget(labelN, 1,0,1,1);
 		pGrid->addWidget(labelMPerpRe, 2,0,1,1);
@@ -172,6 +201,8 @@ public:
 		pGrid->addWidget(m_editPfX, 5,1,1,1);
 		pGrid->addWidget(m_editPfY, 5,2,1,1);
 		pGrid->addWidget(m_editPfZ, 5,3,1,1);
+
+		pGrid->addWidget(m_labelStatus, 6,0,1,4);
 
 
 		// restory window size and position
