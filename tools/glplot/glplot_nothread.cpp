@@ -54,15 +54,17 @@ void set_gl_format(bool bCore, int iMajorVer, int iMinorVer)
 GlPlot_impl::GlPlot_impl(GlPlot *pPlot) : m_pPlot{pPlot},
 	m_matPerspective{m::unit<t_mat_gl>()}, m_matPerspective_inv{m::unit<t_mat_gl>()},
 	m_matViewport{m::unit<t_mat_gl>()}, m_matViewport_inv{m::unit<t_mat_gl>()},
+	m_matCamBase(m::create<t_mat_gl>({1,0,0,0,  0,1,0,0,  0,0,1,-5,  0,0,0,1})),
+	m_matCamRot{m::unit<t_mat_gl>()},
 	m_matCam{m::unit<t_mat_gl>()}, m_matCam_inv{m::unit<t_mat_gl>()},
-	m_matCamRot{m::unit<t_mat_gl>()}
+	m_vecCamX{m::create<t_vec_gl>({1.,0.,0.,0.})}, m_vecCamY{m::create<t_vec_gl>({0.,1.,0.,0.})}
 {
 #if _GL_USE_TIMER != 0
 	connect(&m_timer, &QTimer::timeout, this, static_cast<void (GlPlot_impl::*)()>(&GlPlot_impl::tick));
 	m_timer.start(std::chrono::milliseconds(1000 / 60));
 #endif
 
-	updateCam();
+	UpdateCam();
 }
 
 
@@ -544,7 +546,7 @@ void GlPlot_impl::paintGL()
 		BOOST_SCOPE_EXIT_END
 
 		if(m_bPickerNeedsUpdate)
-			updatePicker();
+			UpdatePicker();
 
 
 		auto *pGl = GetGlFunctions();
@@ -666,17 +668,17 @@ void GlPlot_impl::tick()
 void GlPlot_impl::tick(const std::chrono::milliseconds& ms)
 {
 	// TODO
-	updateCam();
+	UpdateCam();
 }
 
 
-void GlPlot_impl::updateCam()
+void GlPlot_impl::UpdateCam()
 {
 	// zoom
 	t_mat_gl matZoom = m::unit<t_mat_gl>();
 	matZoom(0,0) = matZoom(1,1) = matZoom(2,2) = m_zoom;
 
-	m_matCam = m::create<t_mat_gl>({1,0,0,0,  0,1,0,0,  0,0,1,-5,  0,0,0,1});
+	m_matCam = m_matCamBase;
 	m_matCam *= m_matCamRot;
 	m_matCam *= matZoom;
 	std::tie(m_matCam_inv, std::ignore) = m::inv<t_mat_gl>(m_matCam);
@@ -714,24 +716,24 @@ void GlPlot_impl::mouseMoveEvent(const QPointF& pos)
 		t_real_gl phi = diff.x() + m_phi_saved;
 		t_real_gl theta = diff.y() + m_theta_saved;
 
-		m_matCamRot = m::rotation<t_mat_gl, t_vec_gl>(m::create<t_vec_gl>({1.,0.,0.,0.}), theta/180.*M_PI, 0);
-		m_matCamRot *= m::rotation<t_mat_gl, t_vec_gl>(m::create<t_vec_gl>({0.,1.,0.,0.}), phi/180.*M_PI, 0);
+		m_matCamRot = m::rotation<t_mat_gl, t_vec_gl>(m_vecCamX, theta/180.*M_PI, 0);
+		m_matCamRot *= m::rotation<t_mat_gl, t_vec_gl>(m_vecCamY, phi/180.*M_PI, 0);
 	}
 
-	updateCam();
+	UpdateCam();
 }
 
 
 void GlPlot_impl::zoom(t_real_gl val)
 {
 	m_zoom *= std::pow(2., val/64.);
-	updateCam();
+	UpdateCam();
 }
 
 void GlPlot_impl::ResetZoom()
 {
 	m_zoom = 1;
-	updateCam();
+	UpdateCam();
 }
 
 
@@ -757,7 +759,7 @@ void GlPlot_impl::EndRotation()
 }
 
 
-void GlPlot_impl::updatePicker()
+void GlPlot_impl::UpdatePicker()
 {
 	const bool show_picked_triangle = false;
 

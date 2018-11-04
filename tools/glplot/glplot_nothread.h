@@ -111,8 +111,8 @@ protected:
 	qgl_funcs* GetGlFunctions();
 
 	void tick(const std::chrono::milliseconds& ms);
-	void updatePicker();
-	void updateCam();
+	void UpdatePicker();
+	void UpdateCam();
 
 	GlPlotObj CreateTriangleObject(const std::vector<t_vec3_gl>& verts,
 		const std::vector<t_vec3_gl>& triag_verts, const std::vector<t_vec3_gl>& norms,
@@ -130,8 +130,9 @@ private:
 
 	t_mat_gl m_matPerspective, m_matPerspective_inv;
 	t_mat_gl m_matViewport, m_matViewport_inv;
+	t_mat_gl m_matCamBase, m_matCamRot;
 	t_mat_gl m_matCam, m_matCam_inv;
-	t_mat_gl m_matCamRot;
+	t_vec_gl m_vecCamX, m_vecCamY;
 	t_real_gl m_phi_saved = 0, m_theta_saved = 0;
 	t_real_gl m_zoom = 1.;
 
@@ -177,6 +178,9 @@ public:
 	void SetObjectVisible(std::size_t idx, bool visible);
 
 	const std::string& GetGlDescr() const { return m_strGlDescr; }
+
+	void SetCamBase(const t_mat_gl& mat, const t_vec_gl& vecX, const t_vec_gl& vecY)
+	{ m_matCamBase = mat; m_vecCamX = vecX; m_vecCamY = vecY; UpdateCam(); }
 
 protected slots:
 	void tick();

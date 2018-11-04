@@ -97,9 +97,9 @@ protected slots:
 		if(!m_3dobjsReady)		// create 3d objects
 		{
 			m_arrow_pi = m_plot->GetImpl()->AddArrow(0.05, 1., 0.,0.,0.5,  0.,0.,0.85,1.);
-			m_arrow_pf = m_plot->GetImpl()->AddArrow(0.05, 1., 0.,0.,0.5,  0.,0.85,0.,1.);
+			m_arrow_pf = m_plot->GetImpl()->AddArrow(0.05, 1., 0.,0.,0.5,  0.,0.5,0.,1.);
 			m_arrow_M_Re = m_plot->GetImpl()->AddArrow(0.05, 1., 0.,0.,0.5,  0.85,0.,0.,1.);
-			m_arrow_M_Im = m_plot->GetImpl()->AddArrow(0.05, 1., 0.,0.,0.5,  0.85,0.85,0.,1.);
+			m_arrow_M_Im = m_plot->GetImpl()->AddArrow(0.05, 1., 0.,0.,0.5,  0.85,0.25,0.,1.);
 
 			m_plot->GetImpl()->SetObjectLabel(m_arrow_pi, "P_i");
 			m_plot->GetImpl()->SetObjectLabel(m_arrow_pf, "P_f");
@@ -225,6 +225,9 @@ public:
 		if(m_sett.contains("piz")) m_editPiZ->setText(m_sett.value("piz").toString());
 
 
+		// have scattering plane in horizontal plane
+		m_plot->GetImpl()->SetCamBase(m::create<t_mat_gl>({1,0,0,0,  0,0,1,0,  0,-1,0,-5,  0,0,0,1}),
+			m::create<t_vec_gl>({1,0,0,0}), m::create<t_vec_gl>({0,0,1,0}));
 		CalcPol();
 	}
 
