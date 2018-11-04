@@ -250,10 +250,10 @@ GlPlotObj GlPlot_impl::CreateLineObject(const std::vector<t_vec3_gl>& verts, con
 
 t_mat_gl GlPlot_impl::GetArrowMatrix(const t_vec_gl& vecTo, t_real_gl scale, const t_vec_gl& vecTrans, const t_vec_gl& vecFrom)
 {
-	t_mat_gl mat = m::rotation<t_mat_gl, t_vec_gl>(vecFrom, vecTo);
+	t_mat_gl mat = m::unit<t_mat_gl>(4);
+	mat *= m::rotation<t_mat_gl, t_vec_gl>(vecFrom, vecTo);
 	mat *= m::hom_scaling<t_mat_gl>(scale, scale, scale);
 	mat *= m::hom_translation<t_mat_gl>(vecTrans[0], vecTrans[1], vecTrans[2]);
-
 	return mat;
 }
 

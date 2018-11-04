@@ -18,6 +18,7 @@
 #include <limits>
 #include <algorithm>
 #include <numeric>
+//#include <iostream>
 
 
 namespace m {
@@ -1461,19 +1462,30 @@ t_mat rotation(const t_vec& vec1, const t_vec& vec2)
 requires is_vec<t_vec> && is_mat<t_mat>
 {
 	using t_real = typename t_vec::value_type;
+	constexpr t_real eps = 1e-6;
 
 	// rotation axis
 	t_vec axis = cross<t_vec>({ vec1, vec2 });
 	const t_real lenaxis = norm<t_vec>(axis);
 
-	// collinear vectors?
-	if(equals<t_real>(std::fmod(lenaxis, pi<t_real>), 0))
-		return unit<t_mat>(vec1.size());
-
 	// rotation angle
 	const t_real angle = std::atan2(lenaxis, inner<t_vec>(vec1, vec2));
-	axis /= lenaxis;
+	//std::cout << angle << " " << std::fmod(angle, pi<t_real>) << std::endl;
 
+	// collinear vectors?
+	if(equals<t_real>(angle, 0, eps))
+		return unit<t_mat>(vec1.size());
+	// antiparallel vectors?
+	if(equals<t_real>(std::abs(angle), pi<t_real>, eps))
+	{
+		t_mat mat = -unit<t_mat>(vec1.size());
+		// e.g. homogeneous coordinates -> only have -1 on the first 3 diagonal elements
+		for(std::size_t i=3; i<std::min(mat.size1(), mat.size2()); ++i)
+			mat(i,i) = 1;
+		return mat;
+	}
+
+	axis /= lenaxis;
 	t_mat mat = rotation<t_mat, t_vec>(axis, angle, true);
 	return mat;
 }
