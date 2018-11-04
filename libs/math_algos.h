@@ -1160,6 +1160,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 	auto poly = _poly;
 
 	// transform each vertex of the polygon
+	// TODO: check for homogeneous coordinates!
 	for(t_vec& vec : poly)
 		vec = mat * vec;
 

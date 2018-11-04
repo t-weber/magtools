@@ -763,15 +763,19 @@ void GlPlot_impl::UpdatePicker()
 {
 	const bool show_picked_triangle = false;
 
+	// picker ray
 	auto [org, dir] = m::hom_line_from_screen_coords<t_mat_gl, t_vec_gl>(
 		m_posMouse.x(), m_posMouse.y(), 0., 1., m_matCam_inv,
 		m_matPerspective_inv, m_matViewport_inv, &m_matViewport, true);
+	t_vec3_gl org3 = m::create<t_vec3_gl>({org[0], org[1], org[2]});
+	t_vec3_gl dir3 = m::create<t_vec3_gl>({dir[0], dir[1], dir[2]});
+
 
 	// 3 vertices with rgba colour
 	const t_real_gl colSelected[] = {1.,1.,1.,1., 1.,1.,1.,1., 1.,1.,1.,1.};
 
 	bool hasInters = false;
-	t_vec3_gl vecClosestInters = m::create<t_vec3_gl>({0,0,0});
+	t_vec_gl vecClosestInters = m::create<t_vec3_gl>({0,0,0,0});
 	std::size_t objInters = 0xffffffff;
 
 	for(std::size_t curObj=0; curObj<m_objs.size(); ++curObj)
@@ -799,26 +803,26 @@ void GlPlot_impl::UpdatePicker()
 		{
 			std::vector<t_vec3_gl> poly{{ obj.m_triangles[startidx+0], obj.m_triangles[startidx+1], obj.m_triangles[startidx+2] }};
 			auto [vecInters, bInters, lamInters] =
-				m::intersect_line_poly<t_vec3_gl, t_mat_gl>(
-					t_vec3_gl(org[0], org[1], org[2]), t_vec3_gl(dir[0], dir[1], dir[2]),
-					poly, obj.m_mat);
+				m::intersect_line_poly<t_vec3_gl, t_mat_gl>(org3, dir3, poly, obj.m_mat);
 
 			if(bInters)
 			{
+				t_vec_gl vecInters4 = m::create<t_vec_gl>({vecInters[0], vecInters[1], vecInters[2], 1});
+
 				if(!hasInters)
 				{	// first intersection
-					vecClosestInters = vecInters;
+					vecClosestInters = vecInters4;
 					objInters = curObj;
 					hasInters = true;
 				}
 				else
 				{	// test if next intersection is closer...
-					t_vec3_gl oldPosTrafo = m_matCam * obj.m_mat * vecClosestInters;
-					t_vec3_gl newPosTrafo = m_matCam * obj.m_mat * vecInters;
+					t_vec_gl oldPosTrafo = m_matCam * vecClosestInters;
+					t_vec_gl newPosTrafo = m_matCam * vecInters4;
 
 					if(m::norm(newPosTrafo) < m::norm(oldPosTrafo))
 					{	// ...it is closer
-						vecClosestInters = vecInters;
+						vecClosestInters = vecInters4;
 						objInters = curObj;
 					}
 				}
@@ -837,7 +841,8 @@ void GlPlot_impl::UpdatePicker()
 	}
 
 	m_bPickerNeedsUpdate = false;
-	emit PickerIntersection(hasInters ? &vecClosestInters : nullptr, objInters);
+	t_vec3_gl vecClosestInters3 = m::create<t_vec3_gl>({vecClosestInters[0], vecClosestInters[1], vecClosestInters[2]});
+	emit PickerIntersection(hasInters ? &vecClosestInters3 : nullptr, objInters);
 }
 
 
