@@ -16,6 +16,7 @@
 #include <QtGui/QSurfaceFormat>
 #include <QtGui/QPainter>
 #include <QtGui/QGuiApplication>
+#include <QtCore/QMutex>
 
 #include <iostream>
 #include <boost/scope_exit.hpp>
@@ -34,10 +35,12 @@ void set_gl_format(bool bCore, int iMajorVer, int iMinorVer)
 		surf.setProfile(QSurfaceFormat::CoreProfile);
 	else
 		surf.setProfile(QSurfaceFormat::CompatibilityProfile);
-	surf.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
 
 	if(iMajorVer > 0 && iMinorVer > 0)
 		surf.setVersion(iMajorVer, iMinorVer);
+
+	surf.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
+	surf.setSamples(8);	// multisampling
 
 	QSurfaceFormat::setDefaultFormat(surf);
 }
@@ -482,6 +485,10 @@ void GlPlot_impl::initialiseGL()
 	// options
 	pGl->glCullFace(GL_BACK);
 	pGl->glEnable(GL_CULL_FACE);
+
+	pGl->glEnable(GL_MULTISAMPLE | GL_LINE_SMOOTH | GL_POLYGON_SMOOTH);
+	pGl->glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+	pGl->glHint(GL_POLYGON_SMOOTH_HINT, GL_NICEST);
 }
 
 
@@ -530,6 +537,7 @@ void GlPlot_impl::paintGL()
 	auto *pContext = m_pPlot->context();
 	if(!pContext) return;
 	QPainter painter(m_pPlot);
+	painter.setRenderHint(QPainter::HighQualityAntialiasing);
 
 
 	// gl painting
@@ -771,11 +779,40 @@ void GlPlot_impl::UpdatePicker()
 	t_vec3_gl dir3 = m::create<t_vec3_gl>({dir[0], dir[1], dir[2]});
 
 
+	// intersection with unit sphere around origin
+	bool hasSphereInters = false;
+	t_vec_gl vecClosestSphereInters = m::create<t_vec_gl>({0,0,0,0});
+
+	auto intersUnitSphere =
+		m::intersect_line_sphere<t_vec3_gl, std::vector>(org3, dir3,
+			m::create<t_vec3_gl>({0,0,0}), t_real_gl(1));
+	for(const auto& result : intersUnitSphere)
+	{
+		t_vec_gl vecInters4 = m::create<t_vec_gl>({result[0], result[1], result[2], 1});
+
+		if(!hasSphereInters)
+		{	// first intersection
+			vecClosestSphereInters = vecInters4;
+			hasSphereInters = true;
+		}
+		else
+		{	// test if next intersection is closer...
+			t_vec_gl oldPosTrafo = m_matCam * vecClosestSphereInters;
+			t_vec_gl newPosTrafo = m_matCam * vecInters4;
+
+			// ... it is closer.
+			if(m::norm(newPosTrafo) < m::norm(oldPosTrafo))
+				vecClosestSphereInters = vecInters4;
+		}
+	}
+
+
+	// intersection with geometry
 	// 3 vertices with rgba colour
 	const t_real_gl colSelected[] = {1.,1.,1.,1., 1.,1.,1.,1., 1.,1.,1.,1.};
 
 	bool hasInters = false;
-	t_vec_gl vecClosestInters = m::create<t_vec3_gl>({0,0,0,0});
+	t_vec_gl vecClosestInters = m::create<t_vec_gl>({0,0,0,0});
 	std::size_t objInters = 0xffffffff;
 
 	for(std::size_t curObj=0; curObj<m_objs.size(); ++curObj)
@@ -842,7 +879,9 @@ void GlPlot_impl::UpdatePicker()
 
 	m_bPickerNeedsUpdate = false;
 	t_vec3_gl vecClosestInters3 = m::create<t_vec3_gl>({vecClosestInters[0], vecClosestInters[1], vecClosestInters[2]});
-	emit PickerIntersection(hasInters ? &vecClosestInters3 : nullptr, objInters);
+	t_vec3_gl vecClosestSphereInters3 = m::create<t_vec3_gl>({vecClosestSphereInters[0], vecClosestSphereInters[1], vecClosestSphereInters[2]});
+	emit PickerIntersection(hasInters ? &vecClosestInters3 : nullptr, objInters,
+		hasSphereInters ? &vecClosestSphereInters3 : nullptr);
 }
 
 

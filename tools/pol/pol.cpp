@@ -115,12 +115,17 @@ protected slots:
 	/**
 	 * called when the mouse hovers over an object
 	 */
-	void PickerIntersection(const t_vec3_gl* pos, std::size_t objIdx)
+	void PickerIntersection(const t_vec3_gl* pos, std::size_t objIdx, const t_vec3_gl* posSphere)
 	{
 		/*if(pos)
 		{
 			std::cout << "Intersecting object " << objIdx << " at position "
 				<< (*pos)[0] << ", " << (*pos)[1] << ", " << (*pos)[2] << std::endl;
+		}*/
+		/*if(posSphere)
+		{
+			std::cout << "Intersecting unit sphere at position "
+				<< (*posSphere)[0] << ", " << (*posSphere)[1] << ", " << (*posSphere)[2] << std::endl;
 		}*/
 
 		if(objIdx == m_arrow_pi) m_labelStatus->setText("P_i");

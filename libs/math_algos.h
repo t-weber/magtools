@@ -614,6 +614,28 @@ requires is_vec<t_vec>
 
 
 /**
+ * project vector vec onto another vector vecProj
+ * don't multiply with direction vector
+ */
+template<class t_vec>
+typename t_vec::value_type
+project_scalar(const t_vec& vec, const t_vec& vecProj, bool bIsNormalised = true)
+requires is_vec<t_vec>
+{
+	if(bIsNormalised)
+	{
+		return inner<t_vec>(vec, vecProj);
+	}
+	else
+	{
+		const auto len = norm<t_vec>(vecProj);
+		const t_vec _vecProj = vecProj / len;
+		return inner<t_vec>(vec, _vecProj);
+	}
+}
+
+
+/**
  * project vector vec onto the line lineOrigin + lam*lineDir
  * shift line to go through origin, calculate projection and shift back
  * returns [closest point, distance]
@@ -1065,9 +1087,43 @@ requires is_vec<t_vec>
 
 
 /**
+ * intersection of a sphere  and a line |org> + lam*|dir>
+ * returns vector of intersections
+ * insert |x> = |org> + lam*|dir> in sphere equation <x-mid | x-mid> = r^2
+ * For solution, see: https://en.wikipedia.org/wiki/Line%E2%80%93sphere_intersection
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+t_cont<t_vec>
+intersect_line_sphere(
+	const t_vec& lineOrg, const t_vec& lineDir,
+	const t_vec& sphereOrg, typename t_vec::value_type sphereRad,
+	bool bLineDirIsNormalised = false)
+requires is_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+
+	auto vecDiff = sphereOrg-lineOrg;
+	auto proj = project_scalar<t_vec>(vecDiff, lineDir, bLineDirIsNormalised);
+	auto rt = proj*proj + sphereRad*sphereRad - inner<t_vec>(vecDiff, vecDiff);
+
+	// no intersection
+	if(rt < T(0)) return t_cont<t_vec>{};
+
+	// one intersection
+	if(equals(rt, T(0))) return t_cont<t_vec>{{ lineOrg + proj*lineDir }};
+
+	// two intersections
+	auto val = std::sqrt(rt);
+	auto lam1 = proj + val;
+	auto lam2 = proj - val;
+	return t_cont<t_vec>{{ lineOrg + lam1*lineDir, lineOrg + lam2*lineDir }};
+}
+
+
+/**
  * average vector or matrix
  */
-template<class ty, template<class ...> class t_cont = std::vector>
+template<class ty, template<class...> class t_cont = std::vector>
 ty avg(const t_cont<ty>& vecs)
 requires is_vec<ty> || is_mat<ty>
 {

@@ -198,7 +198,7 @@ public slots:
 	void EndRotation();
 
 signals:
-	void PickerIntersection(const t_vec3_gl* pos, std::size_t objIdx);
+	void PickerIntersection(const t_vec3_gl* pos, std::size_t objIdx, const t_vec3_gl* posSphere);
 };
 
 
