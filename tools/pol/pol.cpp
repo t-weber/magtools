@@ -31,7 +31,7 @@ using t_matvec = std::vector<t_mat>;
 
 // ----------------------------------------------------------------------------
 class PolDlg : public QDialog
-{
+{ /*Q_OBJECT*/
 private:
 	QSettings m_sett{"tobis_stuff", "pol"};
 
@@ -62,7 +62,11 @@ private:
 	std::size_t m_arrow_pf = 0;
 	std::size_t m_arrow_M_Re = 0;
 	std::size_t m_arrow_M_Im = 0;
+
 	bool m_3dobjsReady = false;
+	bool m_mouseDown[3] = {false, false, false};
+	long m_curPickedObj = -1;
+	long m_curDraggedObj = -1;
 
 
 protected:
@@ -122,22 +126,99 @@ protected slots:
 			std::cout << "Intersecting object " << objIdx << " at position "
 				<< (*pos)[0] << ", " << (*pos)[1] << ", " << (*pos)[2] << std::endl;
 		}*/
-		/*if(posSphere)
-		{
-			std::cout << "Intersecting unit sphere at position "
-				<< (*posSphere)[0] << ", " << (*posSphere)[1] << ", " << (*posSphere)[2] << std::endl;
-		}*/
 
-		if(objIdx == m_arrow_pi) m_labelStatus->setText("P_i");
-		else if(objIdx == m_arrow_pf) m_labelStatus->setText("P_f");
-		else if(objIdx == m_arrow_M_Re) m_labelStatus->setText("Re{M_perp}");
-		else if(objIdx == m_arrow_M_Im) m_labelStatus->setText("Im{M_perp}");
+
+		m_curPickedObj = -1;
+		if(pos)
+		{	// object selected?
+			m_curPickedObj = long(objIdx);
+
+			if(objIdx == m_arrow_pi) m_labelStatus->setText("P_i");
+			else if(objIdx == m_arrow_pf) m_labelStatus->setText("P_f");
+			else if(objIdx == m_arrow_M_Re) m_labelStatus->setText("Re{M_perp}");
+			else if(objIdx == m_arrow_M_Im) m_labelStatus->setText("Im{M_perp}");
+			else { m_labelStatus->setText(""); m_curPickedObj = -1; }
+		}
 		else m_labelStatus->setText("");
+
+
+		if(posSphere && m_mouseDown[0])
+		{	// picker intersecting unit sphere and mouse dragged?
+			/*std::cout << "Dragging object " << m_curDraggedObj << " to "
+				<< (*posSphere)[0] << ", " << (*posSphere)[1] << ", " << (*posSphere)[2] << std::endl;*/
+
+			t_vec3_gl posSph = *posSphere;
+
+			if(m_curDraggedObj == m_arrow_pi)
+			{
+				auto lenVec = std::sqrt(std::pow(m_editPiX->text().toDouble(), 2.)
+					+ std::pow(m_editPiY->text().toDouble(), 2.)
+					+ std::pow(m_editPiZ->text().toDouble(), 2.));
+				posSph *= lenVec;
+
+				m_editPiX->setText(QVariant(posSph[0]).toString());
+				m_editPiY->setText(QVariant(posSph[1]).toString());
+				m_editPiZ->setText(QVariant(posSph[2]).toString());
+				CalcPol();
+			}
+			else if(m_curDraggedObj == m_arrow_M_Re)
+			{
+				auto lenVec = std::sqrt(std::pow(m_editMPerpReX->text().toDouble(), 2.)
+					+ std::pow(m_editMPerpReY->text().toDouble(), 2.)
+					+ std::pow(m_editMPerpReZ->text().toDouble(), 2.));
+				posSph *= lenVec;
+
+				m_editMPerpReX->setText(QVariant(posSph[0]).toString());
+				m_editMPerpReY->setText(QVariant(posSph[1]).toString());
+				m_editMPerpReZ->setText(QVariant(posSph[2]).toString());
+				CalcPol();
+			}
+			else if(m_curDraggedObj == m_arrow_M_Im)
+			{
+				auto lenVec = std::sqrt(std::pow(m_editMPerpImX->text().toDouble(), 2.)
+					+ std::pow(m_editMPerpImY->text().toDouble(), 2.)
+					+ std::pow(m_editMPerpImZ->text().toDouble(), 2.));
+				posSph *= lenVec;
+
+				m_editMPerpImX->setText(QVariant(posSph[0]).toString());
+				m_editMPerpImY->setText(QVariant(posSph[1]).toString());
+				m_editMPerpImZ->setText(QVariant(posSph[2]).toString());
+				CalcPol();
+			}
+		}
+	}
+
+
+	/**
+	 * mouse button pressed
+	 */
+	void MouseDown(bool left, bool mid, bool right)
+	{
+		if(left) m_mouseDown[0] = true;
+		if(mid) m_mouseDown[1] = true;
+		if(right) m_mouseDown[2] = true;
+
+		if(m_mouseDown[0])
+			m_curDraggedObj = m_curPickedObj;
+	}
+
+
+	/**
+	 * mouse button released
+	 */
+	void MouseUp(bool left, bool mid, bool right)
+	{
+		if(left) m_mouseDown[0] = false;
+		if(mid) m_mouseDown[1] = false;
+		if(right) m_mouseDown[2] = false;
+
+		if(!m_mouseDown[0])
+			m_curDraggedObj = -1;
 	}
 
 
 public:
-	using QDialog::QDialog;
+	PolDlg() = delete;
 
 	/**
 	 * create UI
@@ -176,6 +257,9 @@ public:
 
 		connect(m_plot.get(), &GlPlot::AfterGLInitialisation, this, &PolDlg::AfterGLInitialisation);
 		connect(m_plot->GetImpl(), &GlPlot_impl::PickerIntersection, this, &PolDlg::PickerIntersection);
+
+		connect(m_plot.get(), &GlPlot::MouseDown, this, &PolDlg::MouseDown);
+		connect(m_plot.get(), &GlPlot::MouseUp, this, &PolDlg::MouseUp);
 
 
 		auto pGrid = new QGridLayout(this);
@@ -342,3 +426,5 @@ int main(int argc, char** argv)
 	return app->exec();
 }
 // ----------------------------------------------------------------------------
+
+//#include "pol.moc"

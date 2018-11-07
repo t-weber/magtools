@@ -228,6 +228,8 @@ private:
 
 signals:
 	void AfterGLInitialisation();
+	void MouseDown(bool left, bool mid, bool right);
+	void MouseUp(bool left, bool mid, bool right);
 };
 
 

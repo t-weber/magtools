@@ -938,6 +938,7 @@ void GlPlot::mousePressEvent(QMouseEvent *pEvt)
 		m_impl->BeginRotation();
 
 	pEvt->accept();
+	emit MouseDown(bLeftDown, bMidDown, bRightDown);
 }
 
 void GlPlot::mouseReleaseEvent(QMouseEvent *pEvt)
@@ -952,6 +953,7 @@ void GlPlot::mouseReleaseEvent(QMouseEvent *pEvt)
 		m_impl->EndRotation();
 
 	pEvt->accept();
+	emit MouseUp(bLeftUp, bMidUp, bRightUp);
 }
 
 void GlPlot::wheelEvent(QWheelEvent *pEvt)
