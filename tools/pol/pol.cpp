@@ -117,6 +117,40 @@ protected slots:
 
 
 	/**
+	 * get the length of a vector
+	 */
+	t_real GetArrowLen(std::size_t objIdx) const
+	{
+		if(objIdx == m_arrow_pi)
+		{
+			return std::sqrt(std::pow(m_editPiX->text().toDouble(), 2.)
+				+ std::pow(m_editPiY->text().toDouble(), 2.)
+				+ std::pow(m_editPiZ->text().toDouble(), 2.));
+		}
+		else if(objIdx == m_arrow_pf)
+		{
+			return std::sqrt(std::pow(m_editPfX->text().toDouble(), 2.)
+				+ std::pow(m_editPfY->text().toDouble(), 2.)
+				+ std::pow(m_editPfZ->text().toDouble(), 2.));
+		}
+		else if(objIdx == m_arrow_M_Re)
+		{
+			return std::sqrt(std::pow(m_editMPerpReX->text().toDouble(), 2.)
+				+ std::pow(m_editMPerpReY->text().toDouble(), 2.)
+				+ std::pow(m_editMPerpReZ->text().toDouble(), 2.));
+		}
+		else if(objIdx == m_arrow_M_Im)
+		{
+			return std::sqrt(std::pow(m_editMPerpImX->text().toDouble(), 2.)
+				+ std::pow(m_editMPerpImY->text().toDouble(), 2.)
+				+ std::pow(m_editMPerpImZ->text().toDouble(), 2.));
+		}
+
+		return -1.;
+	}
+
+
+	/**
 	 * called when the mouse hovers over an object
 	 */
 	void PickerIntersection(const t_vec3_gl* pos, std::size_t objIdx, const t_vec3_gl* posSphere)
@@ -151,11 +185,6 @@ protected slots:
 
 			if(m_curDraggedObj == m_arrow_pi)
 			{
-				auto lenVec = std::sqrt(std::pow(m_editPiX->text().toDouble(), 2.)
-					+ std::pow(m_editPiY->text().toDouble(), 2.)
-					+ std::pow(m_editPiZ->text().toDouble(), 2.));
-				posSph *= lenVec;
-
 				m_editPiX->setText(QVariant(posSph[0]).toString());
 				m_editPiY->setText(QVariant(posSph[1]).toString());
 				m_editPiZ->setText(QVariant(posSph[2]).toString());
@@ -163,11 +192,6 @@ protected slots:
 			}
 			else if(m_curDraggedObj == m_arrow_M_Re)
 			{
-				auto lenVec = std::sqrt(std::pow(m_editMPerpReX->text().toDouble(), 2.)
-					+ std::pow(m_editMPerpReY->text().toDouble(), 2.)
-					+ std::pow(m_editMPerpReZ->text().toDouble(), 2.));
-				posSph *= lenVec;
-
 				m_editMPerpReX->setText(QVariant(posSph[0]).toString());
 				m_editMPerpReY->setText(QVariant(posSph[1]).toString());
 				m_editMPerpReZ->setText(QVariant(posSph[2]).toString());
@@ -175,11 +199,6 @@ protected slots:
 			}
 			else if(m_curDraggedObj == m_arrow_M_Im)
 			{
-				auto lenVec = std::sqrt(std::pow(m_editMPerpImX->text().toDouble(), 2.)
-					+ std::pow(m_editMPerpImY->text().toDouble(), 2.)
-					+ std::pow(m_editMPerpImZ->text().toDouble(), 2.));
-				posSph *= lenVec;
-
 				m_editMPerpImX->setText(QVariant(posSph[0]).toString());
 				m_editMPerpImY->setText(QVariant(posSph[1]).toString());
 				m_editMPerpImZ->setText(QVariant(posSph[2]).toString());
@@ -199,7 +218,12 @@ protected slots:
 		if(right) m_mouseDown[2] = true;
 
 		if(m_mouseDown[0])
+		{
 			m_curDraggedObj = m_curPickedObj;
+			auto lenVec = GetArrowLen(m_curDraggedObj);
+			if(lenVec > 0.)
+				m_plot->GetImpl()->SetPickerSphereRadius(lenVec);
+		}
 	}
 
 
@@ -416,7 +440,7 @@ static inline void set_locales()
 
 int main(int argc, char** argv)
 {
-	set_gl_format(1, _GL_MAJ_VER, _GL_MIN_VER);
+	set_gl_format(1, _GL_MAJ_VER, _GL_MIN_VER, 8);
 	set_locales();
 	auto app = std::make_unique<QApplication>(argc, argv);
 

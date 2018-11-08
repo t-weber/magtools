@@ -56,7 +56,7 @@ static inline void set_locales()
 
 int main(int argc, char** argv)
 {
-	set_gl_format(1, _GL_MAJ_VER, _GL_MIN_VER);
+	set_gl_format(1, _GL_MAJ_VER, _GL_MIN_VER, -1);
 	set_locales();
 	auto app = std::make_unique<QApplication>(argc, argv);
 
